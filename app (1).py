@@ -14,8 +14,8 @@ from resume_parser import parse_resume, resume_context_for_prompt
 
 # ─── Page Config ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="AI Interview Coach",
-    page_icon="🎯",
+    page_title="Crack Interviews in 30 Days | AI Coach",
+    page_icon="🛠️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -275,17 +275,26 @@ if phase == "setup":
     col1, col2, col3 = st.columns([1, 3, 1])
     with col2:
         st.markdown("""
-        <div style="text-align:center; padding: 48px 0 32px;">
-            <div style="font-size:3.5rem; margin-bottom:12px;">🎯</div>
-            <h1 style="font-size:2.4rem; font-weight:800; color:#1e3a5f; margin-bottom:8px;">
-                AI Interview Coach
-            </h1>
-            <p style="color:#64748b; font-size:1.1rem; max-width:480px; margin:0 auto 36px;">
-                Practice role-specific mock interviews, get instant answer evaluation, 
-                and receive a final score with your personalized improvement plan.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+<div style="text-align:center; padding: 48px 0 32px;">
+    
+    <h1 style="font-size:2.4rem; font-weight:800; color:#1e3a5f; margin-bottom:8px;">
+        Build Interview Confidence
+    </h1>
+
+    <p style="color:#64748b; font-size:1.1rem; max-width:520px; margin:0 auto 20px;">
+        Most candidates fail interviews not due to lack of knowledge but due to poor practice and structure
+    </p>
+
+    <p style="color:#334155; font-size:1rem; max-width:520px; margin:0 auto 36px;">
+        Practice real interview questions, get structured feedback,  and improve with a clear plan.
+    </p>
+
+</div>
+st.markdown("""
+<p style="text-align:center; color:#94a3b8; font-size:0.9rem;">
+Used by students preparing for FAANG, startups, and data roles
+</p>
+""", unsafe_allow_html=True)
 
         c1, c2, c3 = st.columns(3)
         features = [
