@@ -1,386 +1,1106 @@
 # interview_engine.py
-# Generates interview questions using rule-based banks. Fully offline — no API.
+# Multi-role AI interview engine — 6 roles, 7 categories, 17 questions each.
+# Fully offline. No API calls.
 
 import random
-import re
 
-# ── Question Banks ─────────────────────────────────────────────────────────────
-# Each role has categorised sub-banks so questions stay varied across dimensions.
+# ── Question Bank ──────────────────────────────────────────────────────────────
+# Each question: { "question": str, "follow_up": str, "difficulty": str, "category": str }
+# difficulty: "easy" | "medium" | "hard"
 
-QUESTION_BANK = {
-    "Data Scientist": {
-        "ml_fundamentals": [
-            "Explain the bias-variance tradeoff and how it affects model selection.",
-            "What is regularisation and when would you choose L1 over L2?",
-            "Walk me through how gradient descent works and its variants (SGD, Adam, RMSProp).",
-            "How does a Random Forest differ from Gradient Boosting? When would you use each?",
-            "Explain how cross-validation works and why k-fold is preferred over a single train/test split.",
-            "What is the curse of dimensionality and how do you mitigate it?",
-            "Describe how a decision tree chooses its splits. What metrics does it use?",
-            "What is the difference between bagging and boosting?",
-            "Explain what precision, recall, and F1-score measure and when each matters more.",
-            "What is ROC-AUC and what does a curve below 0.5 mean?",
-        ],
-        "statistics": [
-            "What is the Central Limit Theorem and why is it important in practice?",
-            "Explain p-values and confidence intervals — what do they actually tell you?",
-            "How would you design an A/B test for a new recommendation feature?",
-            "What is the difference between correlation and causation? Give a concrete example.",
-            "How do you handle multicollinearity in a regression model?",
-            "Explain Bayesian vs frequentist statistics. When would you use each?",
-            "What is a Type I vs Type II error and how do you balance them?",
-            "How do you determine the required sample size for an experiment?",
-            "What statistical tests would you use to compare two groups? Walk me through your decision process.",
-            "Explain what heteroscedasticity is and how you'd detect it.",
-        ],
-        "data_engineering": [
-            "How do you handle missing data? Walk me through your decision process.",
-            "What is your approach to feature selection for a high-dimensional dataset?",
-            "How do you handle class imbalance in a classification problem?",
-            "Walk me through a full feature engineering pipeline you've built.",
-            "How would you detect and handle outliers in a dataset?",
-            "What is data leakage and how do you prevent it?",
-            "How do you validate that your model is learning signal, not noise?",
-            "Explain the difference between normalisation and standardisation. When does it matter?",
-        ],
-        "applied": [
-            "Walk me through a machine learning project you've built end-to-end.",
-            "Describe a time your analysis directly changed a business decision.",
-            "How do you explain a complex model's output to a non-technical stakeholder?",
-            "Tell me about a time a model performed well in development but poorly in production.",
-            "How do you decide when a machine learning solution is overkill?",
-            "Walk me through how you would build a churn prediction model from scratch.",
-            "How would you approach building a recommendation system for an e-commerce site?",
-        ],
-    },
+QUESTION_BANK_BY_ROLE = {
 
-    "Software Engineer (SDE)": {
-        "data_structures_algorithms": [
-            "Explain the difference between a stack and a queue. When would you use each?",
-            "Walk me through how a hash table works, including collision resolution strategies.",
-            "What is the time and space complexity of quicksort? What are its best/worst cases?",
-            "When would you use a graph over a tree data structure?",
-            "Explain dynamic programming. Give an example of a problem it solves well.",
-            "What is the difference between BFS and DFS? When is each appropriate?",
-            "How does a binary search tree differ from a balanced BST like an AVL tree?",
-            "Explain what a heap is and give a real use case for a min-heap.",
-            "What is the difference between O(n log n) and O(n²) in practice at scale?",
-            "How would you detect a cycle in a linked list?",
+    # ══════════════════════════════════════════════════════════════════════════
+    # ROLE: AI Engineer
+    # ══════════════════════════════════════════════════════════════════════════
+    "AI Engineer": {
+        "machine_learning": [
+            {"question": "Explain the bias-variance tradeoff. How does it manifest differently in overparameterised models like large neural networks compared to classical ML models?", "follow_up": "How does double descent relate to this tradeoff?", "difficulty": "medium"},
+            {"question": "Walk me through how gradient descent works, including the key differences between SGD, Mini-batch GD, Adam, and AdamW. When would you choose one over another?", "follow_up": "Why does Adam sometimes generalise worse than SGD despite converging faster?", "difficulty": "medium"},
+            {"question": "What is regularisation and how do L1, L2, and dropout differ mechanistically? In which situations would you prefer each?", "follow_up": "Why does L1 produce sparse weights while L2 does not?", "difficulty": "medium"},
+            {"question": "Explain how cross-entropy loss works for multi-class classification and why it's preferred over MSE for that setting.", "follow_up": "What happens numerically when the model predicts a probability very close to 0 for the true class?", "difficulty": "easy"},
+            {"question": "What is the vanishing gradient problem? How do residual connections, layer normalisation, and careful weight initialisation each help address it?", "follow_up": "Why does batch normalisation sometimes cause issues at inference time?", "difficulty": "medium"},
+            {"question": "Explain how Random Forests and Gradient Boosted Trees differ in how they build ensembles. What are the key hyperparameters that matter most for each?", "follow_up": "How does XGBoost handle missing values during training?", "difficulty": "medium"},
+            {"question": "What is the curse of dimensionality and how does it affect distance-based algorithms like k-NN? What dimensionality reduction techniques would you use and when?", "follow_up": "How does UMAP differ from t-SNE for dimensionality reduction?", "difficulty": "medium"},
+            {"question": "A model has 98% accuracy on a production dataset but is flagged as performing poorly. What questions would you ask first?", "follow_up": "How would you design a monitoring system that catches this type of failure before it impacts users?", "difficulty": "easy"},
+            {"question": "Walk me through how you would approach a severely imbalanced classification problem (1:1000 class ratio) end-to-end — from data handling to evaluation.", "follow_up": "What pitfall arises if you oversample before doing your train/test split?", "difficulty": "medium"},
+            {"question": "Explain transfer learning. When does fine-tuning a pretrained model outperform training from scratch, and what factors drive that decision?", "follow_up": "What is catastrophic forgetting and how do techniques like LoRA help mitigate it?", "difficulty": "hard"},
+            {"question": "How does a Kalman filter work and in what AI/ML application would you use one instead of a neural network?", "follow_up": "What assumption does a Kalman filter make about the underlying system that limits its applicability?", "difficulty": "hard"},
+            {"question": "Explain how Shapley values work for ML model explainability. How do SHAP and LIME differ in their approximation approaches?", "follow_up": "In what scenario could SHAP values be misleading for a stakeholder making a business decision?", "difficulty": "hard"},
+            {"question": "What is Bayesian optimisation and how does it compare to grid search and random search for hyperparameter tuning?", "follow_up": "What acquisition function would you choose for a very expensive-to-evaluate model, and why?", "difficulty": "hard"},
+            {"question": "Describe three evaluation metrics beyond accuracy for a binary classifier and explain when each is most appropriate.", "follow_up": "How do you choose the classification threshold in production, and who should be involved in that decision?", "difficulty": "easy"},
+            {"question": "A stakeholder asks you to add 50 new features to a model. How do you approach feature selection, and what techniques would you use?", "follow_up": "How does multicollinearity between features affect model performance and interpretability differently in linear vs tree-based models?", "difficulty": "medium"},
+            {"question": "What is online learning and how does it differ from batch learning? Give a concrete production use case where online learning is necessary.", "follow_up": "What challenges arise when trying to do model selection and validation in an online learning setting?", "difficulty": "hard"},
+            {"question": "How would you explain a complex ML model's prediction to a non-technical business stakeholder? Walk through a real example.", "follow_up": "How does your explanation strategy change if the model's decision has legal or regulatory implications?", "difficulty": "easy"},
+        ],
+        "deep_learning": [
+            {"question": "Explain the Transformer architecture from the attention mechanism up — how does self-attention work mathematically, and why was it a step change over LSTMs?", "follow_up": "What is the computational complexity of self-attention with respect to sequence length, and how do sparse attention mechanisms address it?", "difficulty": "hard"},
+            {"question": "How does backpropagation through time (BPTT) work in RNNs, and what are the core limitations that led to the development of LSTMs and then Transformers?", "follow_up": "Explain the role of the forget gate in an LSTM and how it addresses vanishing gradients.", "difficulty": "medium"},
+            {"question": "Describe how Convolutional Neural Networks (CNNs) extract features hierarchically. What inductive biases do convolutions encode and why are they useful for images?", "follow_up": "How do Vision Transformers (ViTs) compare to CNNs, and what dataset sizes favour each?", "difficulty": "medium"},
+            {"question": "What is batch normalisation and why does it speed up training? What are its limitations and what alternatives exist?", "follow_up": "Why is layer normalisation preferred over batch normalisation in Transformer architectures?", "difficulty": "medium"},
+            {"question": "Explain the encoder-decoder architecture. Walk me through a concrete use case like machine translation and describe the role of the attention mechanism in the decoder.", "follow_up": "What is the difference between cross-attention and self-attention in this context?", "difficulty": "medium"},
+            {"question": "How do diffusion models work at a high level? How do they differ from GANs and VAEs for generative modelling?", "follow_up": "What is classifier-free guidance and how does it improve output quality?", "difficulty": "hard"},
+            {"question": "What are embeddings in the context of deep learning? Explain how word2vec, GloVe, and contextual embeddings like those from BERT differ fundamentally.", "follow_up": "How would you use embeddings to build a semantic search system?", "difficulty": "easy"},
+            {"question": "Explain dropout regularisation — how does it work during training versus inference, and why does it act as an ensemble method?", "follow_up": "How does Monte Carlo Dropout allow you to estimate model uncertainty?", "difficulty": "medium"},
+            {"question": "Walk me through how you would diagnose and fix a model that has stopped improving after several epochs — what would you check systematically?", "follow_up": "What does the learning rate curve tell you about whether a model has converged correctly?", "difficulty": "medium"},
+            {"question": "What is knowledge distillation? How would you use it to deploy a smaller, faster model in production without significant accuracy loss?", "follow_up": "What is the role of the temperature parameter in the distillation loss?", "difficulty": "hard"},
+            {"question": "Explain positional encoding in Transformers. Why is it necessary and what are the differences between sinusoidal, learned, and rotary positional encodings (RoPE)?", "follow_up": "How does RoPE enable better length generalisation at inference time?", "difficulty": "hard"},
+            {"question": "What is group normalisation and when would you prefer it over batch or layer normalisation?", "follow_up": "How does instance normalisation differ and why is it particularly effective in style transfer tasks?", "difficulty": "hard"},
+            {"question": "Describe the architecture and training process of a GAN. What are the most common failure modes and how do you address them?", "follow_up": "What is mode collapse and how does Wasserstein GAN attempt to solve it?", "difficulty": "hard"},
+            {"question": "Explain the concept of attention heads in a multi-head attention layer. What do different heads typically learn to attend to?", "follow_up": "How would you visualise and interpret attention weights to debug an underperforming Transformer model?", "difficulty": "medium"},
+            {"question": "What is the difference between pre-training and supervised fine-tuning in deep learning? Give a concrete example workflow.", "follow_up": "How would you decide how many layers to freeze versus fine-tune when adapting a pretrained model to a new task?", "difficulty": "easy"},
+            {"question": "How do you choose an activation function for hidden layers in a deep network? Compare ReLU, GELU, SiLU, and Swish.", "follow_up": "Why does dying ReLU occur and how does Leaky ReLU or ELU address it?", "difficulty": "easy"},
+            {"question": "What is mixed precision training and how does it reduce GPU memory usage without sacrificing model quality?", "follow_up": "What is loss scaling and why is it necessary when training with FP16?", "difficulty": "hard"},
+        ],
+        "llm_generative_ai": [
+            {"question": "How does RLHF (Reinforcement Learning from Human Feedback) work? Walk me through the three training stages and the role of the reward model.", "follow_up": "What are the key failure modes of RLHF — specifically reward hacking — and how does DPO attempt to address them?", "difficulty": "hard"},
+            {"question": "Explain the difference between RAG (Retrieval-Augmented Generation) and fine-tuning for adapting an LLM to a new domain. When would you choose each?", "follow_up": "How would you evaluate whether your RAG pipeline is retrieval-limited vs generation-limited?", "difficulty": "medium"},
+            {"question": "What is prompt engineering? Describe five concrete techniques — such as chain-of-thought, few-shot, and self-consistency — and when each applies.", "follow_up": "How does the structure of a system prompt affect the behaviour of an instruction-tuned model at inference time?", "difficulty": "easy"},
+            {"question": "How does the attention mechanism in GPT-style models differ from BERT-style models? What makes GPT decoder-only and BERT encoder-only, and what tasks suit each?", "follow_up": "Why can't you use a decoder-only model for token classification tasks like NER without modification?", "difficulty": "medium"},
+            {"question": "Explain hallucination in LLMs: what causes it mechanistically, and what architectural, training, and inference-time mitigations are available?", "follow_up": "How would you build an automated hallucination detection layer in a production LLM pipeline?", "difficulty": "hard"},
+            {"question": "What is LoRA (Low-Rank Adaptation) and how does it enable efficient fine-tuning of large models? What rank should you choose and why?", "follow_up": "How does QLoRA extend LoRA to further reduce memory requirements during fine-tuning?", "difficulty": "hard"},
+            {"question": "You are asked to build a production LLM-powered chatbot for enterprise customer support. Walk me through your end-to-end architecture choices.", "follow_up": "How would you handle cases where the LLM confidently gives a wrong answer on a domain-specific policy question?", "difficulty": "medium"},
+            {"question": "What are vector databases? How do approximate nearest neighbour algorithms like HNSW and IVF work, and what are the tradeoffs between speed and recall?", "follow_up": "How would you decide the chunk size and overlap strategy when splitting documents for a RAG system?", "difficulty": "medium"},
+            {"question": "Explain how temperature, top-p (nucleus sampling), and top-k sampling affect LLM output quality and creativity. When would you use each?", "follow_up": "What is repetition penalty and when might it hurt output quality rather than help?", "difficulty": "easy"},
+            {"question": "What is an AI agent? Describe the ReAct (Reasoning + Acting) pattern and how tool use works in frameworks like LangChain or the OpenAI function calling API.", "follow_up": "How do you prevent an AI agent from entering an infinite tool-calling loop?", "difficulty": "medium"},
+            {"question": "Explain constitutional AI and how Anthropic's approach differs from traditional RLHF. What problem does it solve?", "follow_up": "What limitations remain in current approaches to AI alignment and safety?", "difficulty": "hard"},
+            {"question": "How does speculative decoding work, and what speedups can it realistically deliver for LLM inference?", "follow_up": "What are the constraints on the draft model and why does acceptance rate vary across tasks?", "difficulty": "hard"},
+            {"question": "Describe the key differences between GPT-4, Gemini, and open-source models like LLaMA in terms of architecture philosophy and deployment considerations.", "follow_up": "For a use case requiring on-premise deployment with no data leaving your servers, how would you approach model selection?", "difficulty": "medium"},
+            {"question": "What is context window management in long-document LLM applications? Describe at least three strategies for handling inputs that exceed the context limit.", "follow_up": "How do approaches like retrieval-augmented context differ from techniques like LongFormer or sliding window attention?", "difficulty": "medium"},
+            {"question": "Explain how function calling / tool use is implemented in the OpenAI or Anthropic API. How would you design a multi-tool pipeline safely?", "follow_up": "How do you handle ambiguous user intent where multiple tools could apply, and what guardrails prevent dangerous tool invocations?", "difficulty": "hard"},
+            {"question": "What is tokenisation and how does Byte-Pair Encoding (BPE) work? How does vocabulary size affect model performance?", "follow_up": "Why do LLMs struggle with simple character-level tasks like counting letters, and what does this reveal about tokenisation?", "difficulty": "easy"},
+            {"question": "How would you evaluate the quality of an LLM output in a production system without human labellers for every response?", "follow_up": "What are the risks of using an LLM as a judge (LLM-as-a-judge) for evaluating other LLM outputs?", "difficulty": "medium"},
+        ],
+        "python_coding": [
+            {"question": "What is Python's GIL (Global Interpreter Lock)? How does it affect CPU-bound vs I/O-bound multithreaded programs, and how do you work around it?", "follow_up": "When would you use multiprocessing vs asyncio vs threading in a data pipeline?", "difficulty": "medium"},
+            {"question": "Explain Python's memory model — how does reference counting work, what triggers garbage collection, and what are common memory leak patterns to avoid?", "follow_up": "How would you profile memory usage in a long-running ML training script?", "difficulty": "hard"},
+            {"question": "How do Python generators and the `yield` keyword work? Give a concrete example where a generator is significantly better than returning a list.", "follow_up": "How does `yield from` work and what is the difference between a generator and an async generator?", "difficulty": "medium"},
+            {"question": "Explain decorators in Python. Write a decorator that measures and logs execution time for any function.", "follow_up": "How would you implement a decorator that retries a function on failure with exponential backoff?", "difficulty": "medium"},
+            {"question": "How would you implement an efficient LRU cache in Python from scratch without using `functools.lru_cache`?", "follow_up": "What data structure gives you O(1) get and put operations, and why?", "difficulty": "hard"},
+            {"question": "You have a list of one million vectors in NumPy. How would you efficiently find the top-10 most similar vectors to a query vector using cosine similarity?", "follow_up": "How does your approach change if you need to run this query 1000 times per second in a production API?", "difficulty": "medium"},
+            {"question": "What are context managers in Python? Implement a context manager using both `__enter__`/`__exit__` and `contextlib.contextmanager`.", "follow_up": "How would you use a context manager to safely manage GPU memory during model inference?", "difficulty": "medium"},
+            {"question": "Explain the difference between deep copy and shallow copy in Python. Give an example where using a shallow copy of a training dataset would cause a bug.", "follow_up": "How does Python handle mutable default arguments and why is it a common pitfall?", "difficulty": "easy"},
+            {"question": "Write a function to implement binary search on a sorted list and explain why it runs in O(log n). How would you extend it to search a rotated sorted array?", "follow_up": "How does `bisect` in the Python standard library work and when would you use it over a manual implementation?", "difficulty": "medium"},
+            {"question": "How does `asyncio` work under the hood? Explain the event loop, coroutines, and tasks — and describe a production use case where async Python improves performance.", "follow_up": "What happens if you call a blocking I/O function inside an async coroutine without `await`?", "difficulty": "hard"},
+            {"question": "What is type hinting in Python and how does it interact with tools like mypy and Pydantic? How have you used it to catch bugs before runtime?", "follow_up": "How would you use Pydantic to validate and sanitise inputs to an LLM API endpoint?", "difficulty": "easy"},
+            {"question": "Describe how you would design a Python package for an internal ML library — project structure, dependency management, versioning, and testing strategy.", "follow_up": "How do you handle breaking API changes when other teams depend on your library?", "difficulty": "medium"},
+            {"question": "Explain metaclasses in Python. Give a real-world scenario in an ML framework where metaclasses are useful.", "follow_up": "How does `__init_subclass__` offer a cleaner alternative to metaclasses in many cases?", "difficulty": "hard"},
+            {"question": "How would you write a Python function that streams tokens from an LLM API and forwards them to a WebSocket client in real time?", "follow_up": "How do you handle backpressure if the client reads slower than the LLM generates tokens?", "difficulty": "hard"},
+            {"question": "What are Python dataclasses and how do they compare to named tuples and Pydantic models for structuring data in an ML pipeline?", "follow_up": "When would you reach for a frozen dataclass versus a Pydantic BaseModel, and what are the performance implications?", "difficulty": "easy"},
+            {"question": "How would you implement a thread-safe in-memory cache for ML model predictions shared across multiple worker processes?", "follow_up": "What issues arise with cache invalidation when the underlying model is updated and how do you handle them?", "difficulty": "hard"},
+            {"question": "Explain list comprehensions, generator expressions, and map/filter in Python. When is each preferred over the others?", "follow_up": "How does a generator expression differ from a list comprehension in terms of memory and laziness?", "difficulty": "easy"},
         ],
         "system_design": [
-            "Describe the most complex system you've designed or significantly contributed to.",
-            "How would you design a URL shortener like bit.ly?",
-            "Explain the CAP theorem and give a real-world tradeoff example.",
-            "How do you decide when to use a cache and when not to?",
-            "Walk me through how you would design a rate limiter.",
-            "How would you design a notification service that handles millions of users?",
-            "Explain the difference between SQL and NoSQL databases. When would you choose each?",
-            "How do you approach horizontal vs vertical scaling?",
-            "What is a message queue and when would you introduce one into an architecture?",
-            "How would you design a system to handle 100x traffic spikes?",
+            {"question": "Design a real-time ML inference system that serves 10,000 requests per second with a p99 latency under 50ms. Walk me through the full architecture.", "follow_up": "How does your design change if the model requires GPU and you cannot exceed a fixed hardware budget?", "difficulty": "hard"},
+            {"question": "Design a feature store for an organisation with 50 ML models in production. What are the core components, and how do you handle point-in-time correctness?", "follow_up": "How do you handle feature drift — where feature distributions shift in the online store but historical training data reflects old distributions?", "difficulty": "hard"},
+            {"question": "How would you design an end-to-end RAG system for a company's internal knowledge base with 10 million documents? Include ingestion, retrieval, and generation layers.", "follow_up": "How would you handle documents that are updated frequently and ensure stale embeddings don't pollute retrieval?", "difficulty": "hard"},
+            {"question": "Design a recommendation system for a content platform with 50 million users. Walk through candidate generation, ranking, and how you would handle the cold-start problem.", "follow_up": "How would you detect and mitigate filter bubbles or popularity bias in your ranker?", "difficulty": "hard"},
+            {"question": "You are asked to design an AI-powered search system to replace keyword search on an e-commerce site. What would your architecture look like?", "follow_up": "How would you run an A/B test to validate that the new system improves purchase conversion rate?", "difficulty": "medium"},
+            {"question": "How would you design a distributed model training pipeline for a 70B parameter model across 256 GPUs? What parallelism strategies would you use?", "follow_up": "What is the difference between tensor parallelism and pipeline parallelism, and what are the communication bottlenecks of each?", "difficulty": "hard"},
+            {"question": "Design a data labelling platform that supports 100 annotators working concurrently on image classification tasks. How do you handle annotation quality and disagreement?", "follow_up": "How would you implement active learning to prioritise which samples to annotate next?", "difficulty": "medium"},
+            {"question": "Walk me through the architecture of a multi-turn conversational AI assistant deployed as a customer service agent. How do you manage context, memory, and fallback paths?", "follow_up": "How would you ensure the agent gracefully hands off to a human agent when it detects it is out of its depth?", "difficulty": "medium"},
+            {"question": "Design a model evaluation platform for a team running 200 experiments per week. What would it track and how would you ensure reproducibility?", "follow_up": "How would you handle comparisons between models trained on different data versions or with different random seeds?", "difficulty": "medium"},
+            {"question": "How would you build a production-grade AI guardrails system to detect and block harmful outputs from an LLM before they reach users?", "follow_up": "How do you balance false positive rate (blocking valid outputs) vs false negative rate (allowing harmful outputs)?", "difficulty": "hard"},
+            {"question": "Design a data flywheel for a product that uses ML predictions: how do you capture implicit and explicit user feedback, retrain, and close the loop?", "follow_up": "How do you prevent the model from reinforcing its own biases through feedback loops?", "difficulty": "hard"},
+            {"question": "You need to build a system that detects anomalies in real-time sensor data from 10,000 IoT devices. Describe your architecture and model choices.", "follow_up": "How do you handle the tradeoff between latency (detecting anomalies fast) and accuracy (avoiding false alarms)?", "difficulty": "medium"},
+            {"question": "Describe how you would architect a multi-tenant LLM API platform where each customer has their own fine-tuned model. How do you handle isolation, cost, and scaling?", "follow_up": "How does model merging or adapter-based serving change the cost profile compared to running a separate model per tenant?", "difficulty": "hard"},
+            {"question": "Design a document intelligence pipeline that extracts structured information from PDFs at scale (1 million documents per day). What are the key components?", "follow_up": "How do you handle varying document layouts, scanned PDFs, and tables within the same pipeline?", "difficulty": "medium"},
+            {"question": "What is a two-tower model architecture and where is it used? How would you train and serve such a model at scale?", "follow_up": "How do you update the item embeddings tower in near-real-time as new items are added to the catalogue?", "difficulty": "hard"},
+            {"question": "Design a simple batch scoring pipeline that runs a model on 10 million rows overnight. What components do you need and what could go wrong?", "follow_up": "How do you ensure the pipeline is idempotent so it can be safely retried on failure?", "difficulty": "easy"},
+            {"question": "Describe the key components of an ML platform that enables data scientists to self-serve model training, experimentation, and deployment.", "follow_up": "How do you balance platform flexibility with guardrails to prevent misuse or runaway compute costs?", "difficulty": "medium"},
         ],
-        "software_craft": [
-            "How do you approach debugging a production incident under pressure?",
-            "Walk me through your approach to writing a code review.",
-            "How do you ensure your code is maintainable for the next engineer?",
-            "Describe a time you had to refactor critical code under time pressure.",
-            "How do you decide when to rewrite vs refactor a piece of code?",
-            "What does good test coverage mean to you? How do you decide what to test?",
-            "Explain SOLID principles. Which do you find hardest to apply consistently?",
-            "How do you manage technical debt in a fast-moving team?",
-        ],
-        "applied": [
-            "Tell me about the most challenging bug you've ever tracked down.",
-            "Describe a time you disagreed with a technical decision and what you did.",
-            "How do you onboard yourself to a large, unfamiliar codebase?",
-            "Tell me about a system you built that failed and what you learned.",
-            "How do you balance shipping fast with maintaining code quality?",
-        ],
-    },
-
-    "ML Engineer": {
         "mlops": [
-            "How do you take a trained model from a notebook to production?",
-            "What is your strategy for detecting and handling model drift?",
-            "Describe how you would design a feature store from scratch.",
-            "Walk me through your ML pipeline monitoring setup.",
-            "How do you handle training/serving skew?",
-            "What CI/CD practices apply specifically to ML pipelines?",
-            "How do you version datasets and models in a reproducible way?",
-            "What is shadow deployment and when would you use it for a new model?",
-            "How do you roll back a bad model in production safely?",
-            "Describe your approach to A/B testing two model versions in production.",
+            {"question": "Walk me through how you would take a PyTorch model from a research notebook to a production REST API — every step including testing, packaging, and monitoring.", "follow_up": "What does your rollback strategy look like if the new model starts degrading production metrics after deployment?", "difficulty": "medium"},
+            {"question": "What is model drift and how do you distinguish between data drift, concept drift, and prediction drift? How do you monitor for each in production?", "follow_up": "How do you decide when drift is severe enough to trigger automatic retraining vs just alerting?", "difficulty": "medium"},
+            {"question": "Explain the difference between shadow deployment, canary releases, and blue-green deployments for ML models. When would you use each?", "follow_up": "How do you handle the case where your shadow model produces results that are directionally good but the ground truth labels aren't yet available?", "difficulty": "hard"},
+            {"question": "What is training/serving skew? Give three concrete examples of how it can occur and how you would detect and fix each.", "follow_up": "How does a feature store with point-in-time joins help prevent training/serving skew?", "difficulty": "hard"},
+            {"question": "How would you containerise a large language model for production serving using Docker? What optimisations would you make for cold start time and memory footprint?", "follow_up": "How does ONNX Runtime or TensorRT change the serving performance profile compared to PyTorch eager mode?", "difficulty": "medium"},
+            {"question": "Describe how you would design a CI/CD pipeline specifically for ML — what additional stages does it need compared to a standard software pipeline?", "follow_up": "How do you handle the non-determinism of model training in an automated test suite?", "difficulty": "medium"},
+            {"question": "What is model quantisation? Explain the difference between post-training quantisation (PTQ) and quantisation-aware training (QAT), and describe their accuracy/speed tradeoffs.", "follow_up": "When does INT8 quantisation cause significant accuracy degradation and how would you handle that?", "difficulty": "hard"},
+            {"question": "How would you design the logging and observability stack for a production ML system that processes 1 million predictions per day?", "follow_up": "How do you correlate individual prediction logs with downstream business outcomes like conversions or churn?", "difficulty": "medium"},
+            {"question": "Explain how Kubernetes horizontal pod autoscaling (HPA) works, and describe the specific challenges of autoscaling GPU-based ML workloads compared to CPU services.", "follow_up": "How does KEDA differ from standard HPA for scaling ML inference workloads based on queue depth?", "difficulty": "hard"},
+            {"question": "What is an experiment tracking system like MLflow or Weights & Biases? What metadata should every ML experiment log and why?", "follow_up": "How do you structure experiment names and tags to make it easy to reproduce results 6 months later?", "difficulty": "easy"},
+            {"question": "Walk me through how you would set up automated retraining for a production model — what triggers retraining, how is the new model validated, and how does it get promoted?", "follow_up": "How do you prevent a retraining pipeline from accidentally promoting a model that trained on corrupted data?", "difficulty": "hard"},
+            {"question": "What is vLLM and how does PagedAttention work? When would you choose vLLM over Triton Inference Server for LLM serving?", "follow_up": "How does continuous batching in vLLM improve GPU utilisation compared to static batching?", "difficulty": "hard"},
+            {"question": "Describe how you would implement online A/B testing for two ML models in production. What statistical considerations matter most?", "follow_up": "How do you handle novelty effects — users behaving differently simply because something changed — in your A/B test analysis?", "difficulty": "medium"},
+            {"question": "What is model pruning? Explain structured vs unstructured pruning and describe the workflow for pruning a transformer model without losing accuracy.", "follow_up": "How does magnitude pruning compare to movement pruning and when does each produce better results?", "difficulty": "hard"},
+            {"question": "How would you build a cost attribution system to track per-team or per-feature GPU spending in a shared ML platform?", "follow_up": "How do you incentivise teams to optimise their compute usage without creating bureaucratic bottlenecks?", "difficulty": "medium"},
+            {"question": "What is data versioning in an ML pipeline and why does it matter? Which tools would you use to version datasets and how?", "follow_up": "How do you tie a specific model version to the exact dataset version and code version it was trained on?", "difficulty": "easy"},
+            {"question": "Describe your approach to writing unit and integration tests for an ML pipeline. What makes ML testing fundamentally different from software testing?", "follow_up": "How do you test data preprocessing steps to ensure they behave correctly on edge cases and distribution shifts?", "difficulty": "easy"},
         ],
-        "infrastructure": [
-            "How do you optimise model inference latency without sacrificing accuracy?",
-            "Explain the tradeoffs between batch inference and real-time inference.",
-            "How would you build a scalable data ingestion pipeline for training?",
-            "What is model quantisation and when is it appropriate?",
-            "How do you containerise and deploy an ML model with Docker and Kubernetes?",
-            "Explain the role of a model registry in an MLOps workflow.",
-            "How do you manage compute costs for large-scale model training?",
-            "What tools have you used for experiment tracking and why?",
-        ],
-        "ml_fundamentals": [
-            "Explain the bias-variance tradeoff in the context of production ML systems.",
-            "How do you handle class imbalance for a model that serves live traffic?",
-            "What is transfer learning and when does it save you significant effort?",
-            "Walk me through how you would choose between fine-tuning and training from scratch.",
-            "How do you evaluate a model's fairness across demographic groups?",
-            "Explain regularisation and when it matters most in production models.",
-        ],
-        "applied": [
-            "Describe a production ML incident you dealt with and how you resolved it.",
-            "Tell me about the most complex ML system you've shipped end-to-end.",
-            "How do you communicate model performance to a non-technical product team?",
-            "Walk me through a time you had to debug a model that worked in dev but failed in prod.",
-            "How do you prioritise which models to maintain vs deprecate?",
-        ],
-    },
-
-    "Product Manager": {
-        "strategy": [
-            "How do you prioritise features when resources are constrained?",
-            "Walk me through a product you took from 0 to 1.",
-            "How do you identify the right problem to solve before building anything?",
-            "How do you decide whether to build, buy, or partner for a capability?",
-            "Describe how you would respond to a major competitor launching a similar feature.",
-            "How do you define and defend your product's north star metric?",
-            "How do you balance short-term user requests with long-term product vision?",
-        ],
-        "execution": [
-            "How do you measure the success of a feature after launch?",
-            "Describe how you'd handle a major unexplained drop in a key metric.",
-            "How do you align engineering, design, and business on a roadmap?",
-            "Walk me through how you write a product requirements document.",
-            "How do you manage scope creep on a project with a fixed deadline?",
-            "How do you decide when a feature is good enough to ship?",
-        ],
-        "applied": [
-            "Tell me about a product decision you made that turned out to be wrong.",
-            "How do you handle pushback from engineering on your priorities?",
-            "Describe the most difficult stakeholder situation you've navigated.",
-            "How do you gather and validate user insights before committing to a feature?",
-            "Tell me about a time you had to kill a feature or project mid-stream.",
+        "behavioral": [
+            {"question": "Tell me about the most impactful AI system you've built end-to-end. What were the key decisions you made and what would you do differently?", "follow_up": "How did you measure and communicate its business impact to non-technical stakeholders?", "difficulty": "medium"},
+            {"question": "Describe a time when a model performed well in development but failed in production. How did you diagnose the root cause and what did you change?", "follow_up": "What process or guardrails did you put in place to prevent the same failure from recurring?", "difficulty": "medium"},
+            {"question": "Tell me about a disagreement you had with a teammate or manager about a technical approach in an AI project. How did you handle it?", "follow_up": "Looking back, do you think you were right, and how has that experience changed how you handle technical disagreements today?", "difficulty": "medium"},
+            {"question": "Describe a time when you had to learn a completely new ML technique or framework under significant time pressure. How did you approach it?", "follow_up": "What resources or strategies do you rely on to accelerate your learning when facing an unfamiliar problem area?", "difficulty": "easy"},
+            {"question": "Tell me about a project where the data was much messier or more limited than expected. How did you adapt your approach?", "follow_up": "At what point do you decide the data is too poor to build a reliable model versus working around the limitations?", "difficulty": "medium"},
+            {"question": "Describe a situation where you had to push back on a stakeholder who wanted to use AI where it wasn't the right solution. How did you approach that conversation?", "follow_up": "How do you balance advocating for technical correctness with maintaining a good relationship with stakeholders?", "difficulty": "medium"},
+            {"question": "Walk me through how you prioritise technical debt in a fast-moving AI project. Can you give a concrete example where you had to make a hard call?", "follow_up": "How do you document and communicate technical debt so future team members understand the tradeoffs you made?", "difficulty": "medium"},
+            {"question": "Tell me about the most complex debugging experience you've had with a neural network. How did you narrow down the cause and fix it?", "follow_up": "What diagnostic tools or techniques have become a standard part of your debugging toolkit for neural networks?", "difficulty": "hard"},
+            {"question": "Describe a time when you had to communicate a negative result — a model that didn't work as hoped — to leadership. How did you frame it?", "follow_up": "What did you propose as the next steps and how was it received?", "difficulty": "medium"},
+            {"question": "How do you stay current with the fast pace of AI research? Give a concrete example of a recent paper or technique that changed how you approach a problem.", "follow_up": "How do you evaluate whether a new technique from a paper is actually ready to use in production versus being a research curiosity?", "difficulty": "easy"},
+            {"question": "Tell me about a time you had to deliver a project with incomplete information or ambiguous requirements. How did you make progress without clarity?", "follow_up": "How do you decide when to ask for more information versus when to proceed with assumptions and document them?", "difficulty": "medium"},
+            {"question": "Describe a situation where you identified an ethical risk or bias issue in an AI system you were building. What did you do about it?", "follow_up": "How do you systematically audit a model for bias before deployment, and who should be involved in that process?", "difficulty": "hard"},
+            {"question": "Tell me about a time you mentored a junior engineer or data scientist. What did you focus on and how did you measure your impact?", "follow_up": "How do you adapt your mentoring style for someone who is technically strong but struggles with communication?", "difficulty": "easy"},
+            {"question": "Describe a project where you had to balance speed of delivery with model quality. How did you make that tradeoff?", "follow_up": "How do you communicate quality tradeoffs to a product manager who is pushing for a faster release?", "difficulty": "medium"},
+            {"question": "Tell me about the most technically ambiguous problem you've faced in your AI career. How did you structure your thinking and make a decision?", "follow_up": "How do you know when you've gathered enough evidence to commit to an approach versus when to keep experimenting?", "difficulty": "hard"},
+            {"question": "Describe a time you had to work cross-functionally with non-technical teams (legal, product, operations) to ship an AI feature. What challenges arose?", "follow_up": "How do you bridge the communication gap between ML practitioners and business teams who have different vocabularies?", "difficulty": "easy"},
+            {"question": "Tell me about a time when an AI project you led was at risk of missing its deadline. How did you respond and what was the outcome?", "follow_up": "What did you learn about project scoping and risk management that you apply to new projects today?", "difficulty": "hard"},
         ],
     },
 
-    "Data Analyst": {
-        "sql_data": [
-            "Walk me through the most complex SQL query you've written and why it was needed.",
-            "How do you validate data quality before running an analysis?",
-            "Explain the difference between INNER JOIN, LEFT JOIN, and FULL OUTER JOIN with examples.",
-            "How do you handle conflicting data from two sources?",
-            "What is a window function? Give a real example of when you'd use one.",
-            "How do you approach exploratory data analysis on a dataset you've never seen?",
-            "What does it mean for data to be 'tidy' and why does it matter?",
-        ],
-        "statistics_analysis": [
-            "Walk me through a time your analysis changed a business decision.",
-            "How do you detect and handle outliers in an analytical dataset?",
-            "What is cohort analysis and when is it the right tool?",
-            "How do you determine whether a metric change is statistically meaningful?",
-            "Explain funnel analysis and how you'd diagnose a drop at a specific stage.",
-            "What is the difference between a leading and a lagging indicator?",
-        ],
-        "communication": [
-            "How do you communicate findings to a non-technical audience?",
-            "Describe a time you had to push back on a stakeholder's interpretation of data.",
-            "How do you decide what to include vs exclude from an analysis presentation?",
-            "How do you visualise data to make a recommendation clear and defensible?",
-            "Tell me about a time you caught an error in someone else's analysis.",
-        ],
-    },
-}
-
-# ── Resume Keyword → Sub-bank Mapping ─────────────────────────────────────────
-# If resume contains these keywords, bias toward that sub-bank for variety.
-
-RESUME_KEYWORD_MAP = {
+    # ══════════════════════════════════════════════════════════════════════════
+    # ROLE: Data Scientist
+    # ══════════════════════════════════════════════════════════════════════════
     "Data Scientist": {
-        "tensorflow keras pytorch deep learning neural": "ml_fundamentals",
-        "experiment hypothesis ab test p-value statistics": "statistics",
-        "spark hadoop pipeline etl feature engineering": "data_engineering",
-        "stakeholder business dashboard reporting": "applied",
+        "machine_learning": [
+            {"question": "You are given a dataset with 500 features and 10,000 rows. Walk me through your end-to-end feature selection and modelling strategy.", "follow_up": "How do you detect and handle multicollinearity before feeding features into a linear model?", "difficulty": "medium"},
+            {"question": "Explain the difference between parametric and non-parametric statistical tests. Give examples of when each applies in a data science context.", "follow_up": "What assumptions does a t-test make and how do you check them on real data?", "difficulty": "easy"},
+            {"question": "How does logistic regression work mechanically? Explain the cost function and how the model is trained.", "follow_up": "How does logistic regression relate to a single-layer neural network with a sigmoid activation?", "difficulty": "easy"},
+            {"question": "Walk me through how you would approach an A/B test from hypothesis design to statistical conclusion. What are the most common mistakes?", "follow_up": "What is the multiple comparisons problem and how does the Bonferroni correction address it?", "difficulty": "medium"},
+            {"question": "Explain the concept of p-values. Why are they frequently misinterpreted and what alternatives exist?", "follow_up": "How does Bayesian hypothesis testing differ from frequentist approaches and what are its practical advantages?", "difficulty": "medium"},
+            {"question": "How does a Support Vector Machine (SVM) find the optimal decision boundary? What role does the kernel trick play?", "follow_up": "When would you choose an SVM over a gradient boosted tree on a tabular dataset?", "difficulty": "medium"},
+            {"question": "Describe the k-means clustering algorithm. What are its limitations and how do DBSCAN and Gaussian Mixture Models address them?", "follow_up": "How do you choose the optimal number of clusters and evaluate cluster quality when you have no ground truth labels?", "difficulty": "medium"},
+            {"question": "What is survival analysis and when would you use it in a data science project?", "follow_up": "How does the Kaplan-Meier estimator differ from the Cox proportional hazards model?", "difficulty": "hard"},
+            {"question": "Explain overfitting. Describe three independent techniques you would use to diagnose and fix it in a gradient boosted model.", "follow_up": "What is the relationship between early stopping and regularisation in gradient boosting?", "difficulty": "easy"},
+            {"question": "How does principal component analysis (PCA) work mathematically? What are its assumptions and limitations?", "follow_up": "How would you use PCA for anomaly detection in a high-dimensional dataset?", "difficulty": "medium"},
+            {"question": "You discover your training data has significant label noise — some fraction of labels are simply wrong. How do you handle this?", "follow_up": "What is confident learning and how does it use model predicted probabilities to identify noisy labels?", "difficulty": "hard"},
+            {"question": "Explain how causal inference differs from predictive modelling. Why does correlation not imply causation in a data science context?", "follow_up": "What is a propensity score and how is it used in observational studies to approximate causal effects?", "difficulty": "hard"},
+            {"question": "Describe the difference between MAE, MSE, RMSE, and MAPE for regression evaluation. When is each metric most appropriate?", "follow_up": "Why is MAPE problematic when actual values are close to zero, and what alternatives would you use?", "difficulty": "easy"},
+            {"question": "What is the difference between Frequentist and Bayesian approaches to model building? Give a concrete example where Bayesian modelling provides a clear advantage.", "follow_up": "How do you choose a prior distribution and how sensitive are Bayesian model results to that choice?", "difficulty": "hard"},
+            {"question": "How would you design a machine learning solution for a time-series forecasting problem with seasonality and trend?", "follow_up": "How does Prophet differ from ARIMA and when would you prefer a neural approach like LSTM or Temporal Fusion Transformer?", "difficulty": "hard"},
+            {"question": "What is the purpose of stratified cross-validation and when is it essential?", "follow_up": "How does group k-fold cross-validation differ and when would you use it over standard k-fold?", "difficulty": "easy"},
+            {"question": "A business stakeholder asks you to explain why your model made a specific prediction. How do you approach this?", "follow_up": "How do you decide whether to prioritise a more interpretable model or a more accurate black-box model for this use case?", "difficulty": "easy"},
+        ],
+        "deep_learning": [
+            {"question": "As a data scientist, when do you reach for a deep learning approach versus a classical ML approach? What factors drive that decision?", "follow_up": "What minimum dataset size would you typically need before a deep learning model starts outperforming gradient boosting on tabular data?", "difficulty": "easy"},
+            {"question": "Explain how convolutional neural networks work. What inductive biases make them well-suited to image data?", "follow_up": "How would you use a pretrained CNN like ResNet for a custom image classification task with only 500 labelled examples?", "difficulty": "medium"},
+            {"question": "What is a recurrent neural network and how does it handle sequential data? What are the key limitations compared to Transformers?", "follow_up": "How does the attention mechanism in a Transformer overcome the long-range dependency problem of RNNs?", "difficulty": "medium"},
+            {"question": "Explain what an autoencoder is and describe three practical use cases for it in data science.", "follow_up": "How does a variational autoencoder (VAE) differ from a standard autoencoder and what does it enable?", "difficulty": "medium"},
+            {"question": "How would you use deep learning for anomaly detection in tabular data? What architectures would you consider?", "follow_up": "How does an autoencoder-based anomaly detector decide the reconstruction error threshold for flagging anomalies?", "difficulty": "hard"},
+            {"question": "What is the purpose of dropout and batch normalisation in a neural network? How do they interact with each other?", "follow_up": "Why can using dropout and batch normalisation together sometimes hurt performance?", "difficulty": "medium"},
+            {"question": "Describe the concept of embeddings for categorical variables. How would you train entity embeddings for a tabular ML problem?", "follow_up": "How do you handle a high-cardinality categorical variable with 10,000 unique values in a neural network?", "difficulty": "medium"},
+            {"question": "How does transfer learning work for NLP tasks? Describe a workflow for adapting a pre-trained language model to a text classification problem.", "follow_up": "How many labelled examples do you typically need before fine-tuning outperforms few-shot prompting?", "difficulty": "easy"},
+            {"question": "What is a Graph Neural Network (GNN) and what types of problems are they best suited for?", "follow_up": "How does a GNN handle graphs with varying node counts and edge structures as inputs?", "difficulty": "hard"},
+            {"question": "Explain the vanishing gradient problem in deep networks. What architectural choices help mitigate it?", "follow_up": "How does He initialisation differ from Xavier initialisation and when is each appropriate?", "difficulty": "medium"},
+            {"question": "How would you interpret and debug a deep learning model that is performing poorly? What tools and techniques would you use?", "follow_up": "What does a learning curve where training loss decreases but validation loss increases tell you, and what would you do?", "difficulty": "easy"},
+            {"question": "Describe how attention mechanisms work in the context of Transformers. Why is multi-head attention important?", "follow_up": "How does scaled dot-product attention prevent the dot products from growing too large and why does that matter?", "difficulty": "hard"},
+            {"question": "What is knowledge distillation and how can a data scientist use it to deploy a more computationally efficient model?", "follow_up": "What hyperparameters control the quality of the distillation and how do you tune them?", "difficulty": "hard"},
+            {"question": "How do you handle class imbalance when training a deep learning model for classification?", "follow_up": "What is focal loss and how does it differ from weighted cross-entropy for handling class imbalance?", "difficulty": "medium"},
+            {"question": "What is a Siamese network and what kinds of tasks is it used for?", "follow_up": "How would you use a Siamese network to build a similarity-based search system?", "difficulty": "hard"},
+            {"question": "Explain the difference between pre-training, fine-tuning, and feature extraction when adapting a deep learning model to a new task.", "follow_up": "When does feature extraction outperform full fine-tuning and why?", "difficulty": "easy"},
+            {"question": "How do you choose the number of layers and neurons in a neural network? What is the role of architecture search?", "follow_up": "How does neural architecture search (NAS) work at a high level and is it practical for a typical data science project?", "difficulty": "hard"},
+        ],
+        "llm_generative_ai": [
+            {"question": "As a data scientist, how would you evaluate whether an LLM is appropriate for solving a specific business problem versus a classical ML approach?", "follow_up": "What cost, latency, and accuracy tradeoffs would you present to a stakeholder when recommending an LLM solution?", "difficulty": "easy"},
+            {"question": "Explain what RAG (Retrieval-Augmented Generation) is and how a data scientist would set up a simple RAG pipeline for internal document search.", "follow_up": "How do you evaluate the quality of retrieval separately from the quality of generation in a RAG system?", "difficulty": "medium"},
+            {"question": "How would you approach fine-tuning an open-source LLM for a domain-specific text classification task? What data preparation steps are needed?", "follow_up": "How many labelled examples are typically needed for instruction fine-tuning to outperform few-shot prompting?", "difficulty": "medium"},
+            {"question": "What is prompt engineering? Describe chain-of-thought, few-shot, and zero-shot prompting with an example of each.", "follow_up": "How does the order of few-shot examples in a prompt affect model performance, and why?", "difficulty": "easy"},
+            {"question": "How would you build an LLM-powered text summarisation pipeline for a corpus of 100,000 research papers? What are the key design decisions?", "follow_up": "How do you evaluate summary quality automatically when human labellers are not available?", "difficulty": "medium"},
+            {"question": "What are the main risks of deploying an LLM in a production data science application, and how would you mitigate them?", "follow_up": "How do you handle hallucinations in a business context where factual accuracy is critical?", "difficulty": "medium"},
+            {"question": "Explain how vector similarity search works. How would you build a semantic search system over a dataset of product descriptions?", "follow_up": "How does approximate nearest neighbour search (e.g., HNSW) trade off recall for speed?", "difficulty": "medium"},
+            {"question": "How would you use an LLM to automate feature engineering from unstructured text data in a machine learning pipeline?", "follow_up": "What are the risks of using LLM-generated features in a model that will be used for high-stakes decisions?", "difficulty": "hard"},
+            {"question": "What is the difference between zero-shot and few-shot classification using an LLM? When would you prefer one over the other?", "follow_up": "How would you compare LLM-based classification against a fine-tuned BERT model for the same task?", "difficulty": "easy"},
+            {"question": "How does tokenisation affect LLM performance on numerical or code-heavy inputs? What practical issues arise?", "follow_up": "What preprocessing steps help LLMs handle numerical data more reliably?", "difficulty": "hard"},
+            {"question": "Describe how you would implement an LLM-based data extraction pipeline to pull structured fields from unstructured clinical notes.", "follow_up": "How do you validate extraction accuracy and handle cases where the LLM extracts incorrect or ambiguous information?", "difficulty": "hard"},
+            {"question": "What is instruction tuning and how does it differ from standard supervised fine-tuning of a language model?", "follow_up": "How do you format instruction-following datasets (prompt/response pairs) to maximise fine-tuning quality?", "difficulty": "medium"},
+            {"question": "How would you use an LLM to assist with exploratory data analysis (EDA) on a new dataset?", "follow_up": "What are the limitations of using an LLM to automatically generate statistical insights from data?", "difficulty": "easy"},
+            {"question": "Explain what LLM agents are and how you would use one to automate a multi-step data analysis workflow.", "follow_up": "What safeguards do you put in place to ensure an LLM agent does not make irreversible changes to production data?", "difficulty": "hard"},
+            {"question": "What is constitutional AI and why does it matter for a data scientist building a customer-facing LLM application?", "follow_up": "How would you implement content moderation guardrails for an LLM API in a production setting?", "difficulty": "hard"},
+            {"question": "How does context window size affect what you can do with an LLM in a data science workflow?", "follow_up": "What strategies do you use to fit a long document into an LLM context window for analysis?", "difficulty": "easy"},
+            {"question": "How do you benchmark two different LLMs for the same use case in a rigorous, reproducible way?", "follow_up": "What are the risks of benchmarking LLMs on public datasets that may have been part of their training data?", "difficulty": "medium"},
+        ],
+        "python_coding": [
+            {"question": "How would you use Pandas to clean and transform a dataset with missing values, duplicate rows, and mixed data types?", "follow_up": "How does pandas handle memory efficiency for large DataFrames, and what alternatives exist for very large datasets?", "difficulty": "easy"},
+            {"question": "Explain how NumPy broadcasting works. Write an example where it avoids a nested loop and describe the performance implications.", "follow_up": "When can broadcasting cause unexpected bugs, and how do you guard against them?", "difficulty": "medium"},
+            {"question": "How would you implement a data pipeline in Python that reads from a SQL database, transforms the data, and writes results to S3?", "follow_up": "How do you handle errors and partial failures in a multi-step data pipeline without losing data?", "difficulty": "medium"},
+            {"question": "Explain Python decorators and write a decorator that logs function arguments and return values for debugging a data pipeline.", "follow_up": "How would you use `functools.wraps` and why is it important when writing decorators?", "difficulty": "medium"},
+            {"question": "How do you use Python's `multiprocessing` library to parallelise feature engineering across multiple CPU cores?", "follow_up": "What are the pitfalls of sharing large data structures (like a Pandas DataFrame) between processes?", "difficulty": "medium"},
+            {"question": "Write a Python function that reads a large CSV file in chunks and computes the mean of a column without loading the entire file into memory.", "follow_up": "How does Dask extend pandas to support out-of-core computation on datasets that exceed RAM?", "difficulty": "easy"},
+            {"question": "How would you write unit tests for a data preprocessing function in Python? What makes testing data transformations tricky?", "follow_up": "How do you use property-based testing (e.g., Hypothesis) to catch edge cases in data transformation code?", "difficulty": "medium"},
+            {"question": "Explain list comprehensions and generator expressions in Python. When do generators provide a memory advantage?", "follow_up": "How would you use a generator to stream predictions from a model over a large dataset without holding all results in memory?", "difficulty": "easy"},
+            {"question": "How would you use SQLAlchemy or a similar ORM to query a database in a data science project? What are the advantages over raw SQL?", "follow_up": "When does using raw SQL outperform an ORM for data science queries and why?", "difficulty": "medium"},
+            {"question": "Explain how type hints and dataclasses improve code quality in a data science project.", "follow_up": "How would you use Pydantic to validate the schema of a data pipeline's input and output?", "difficulty": "easy"},
+            {"question": "How do you profile and optimise slow Python code in a data analysis pipeline? What tools and strategies do you use?", "follow_up": "What is the difference between CPU profiling with cProfile and memory profiling with memory_profiler?", "difficulty": "medium"},
+            {"question": "How would you implement a reproducible machine learning experiment in Python — from random seeds to environment management?", "follow_up": "How do tools like Poetry or conda help ensure reproducibility across different developer machines?", "difficulty": "easy"},
+            {"question": "How would you implement a custom Scikit-learn transformer that fits and transforms a dataset consistently?", "follow_up": "Why is it important to fit your transformer only on training data and not on the full dataset, and how does a Pipeline enforce this?", "difficulty": "hard"},
+            {"question": "Explain how Python's `asyncio` works and describe a use case in data science where asynchronous programming improves performance.", "follow_up": "What happens if you call a synchronous blocking function inside an async context and how do you fix it?", "difficulty": "hard"},
+            {"question": "How would you design a Python class hierarchy for a family of ML models that share common evaluation logic but differ in training?", "follow_up": "What is the role of abstract base classes (ABCs) and how do they enforce a common interface?", "difficulty": "hard"},
+            {"question": "What is the difference between shallow copy and deep copy in Python? Give an example where a shallow copy of a data object causes a bug.", "follow_up": "How does Python's `copy` module handle nested mutable objects?", "difficulty": "easy"},
+            {"question": "How would you build a simple REST API in Python using FastAPI that serves predictions from a scikit-learn model?", "follow_up": "How do you handle concurrent requests efficiently and ensure thread safety for the loaded model object?", "difficulty": "hard"},
+        ],
+        "system_design": [
+            {"question": "Design a data pipeline that ingests 1 TB of raw event data daily, cleans it, and makes it available for analytics queries. What components would you use?", "follow_up": "How do you ensure data quality at each stage of the pipeline and alert on anomalies?", "difficulty": "medium"},
+            {"question": "How would you design a batch prediction system that scores 50 million customer records overnight using an ML model?", "follow_up": "How do you ensure the scoring is reproducible and auditable if a business stakeholder questions a specific prediction?", "difficulty": "medium"},
+            {"question": "Describe the architecture of an end-to-end machine learning platform for a mid-sized organisation. What components are essential?", "follow_up": "How do you handle the transition from data scientists running experiments locally to production-grade model training on the platform?", "difficulty": "hard"},
+            {"question": "How would you design a recommendation system for an e-commerce platform? What data, models, and infrastructure are needed?", "follow_up": "How do you handle the cold-start problem for new users and new products?", "difficulty": "hard"},
+            {"question": "Design a system for real-time fraud detection on credit card transactions. What are the key components and latency requirements?", "follow_up": "How do you retrain the fraud model quickly when a new fraud pattern emerges without disrupting the live system?", "difficulty": "hard"},
+            {"question": "How would you design a data warehouse for an organisation that wants to enable self-serve analytics for 200 analysts?", "follow_up": "How do you govern data access, ensure data quality, and manage schema evolution over time?", "difficulty": "medium"},
+            {"question": "Describe how you would design an A/B testing platform from scratch. What are the core components?", "follow_up": "How do you ensure experiment isolation so that multiple experiments running simultaneously don't interfere with each other?", "difficulty": "hard"},
+            {"question": "How would you architect a time-series forecasting system for demand planning at a retail company with 10,000 SKUs?", "follow_up": "How do you handle SKUs with very sparse historical data (new products) alongside mature products with years of history?", "difficulty": "hard"},
+            {"question": "What is a feature store and why does a data science team need one? What are the key design considerations?", "follow_up": "How does the feature store prevent training/serving skew and how do you enforce point-in-time correctness?", "difficulty": "medium"},
+            {"question": "Design a customer churn prediction system that is used by the sales team to prioritise outreach. What does the end-to-end architecture look like?", "follow_up": "How do you handle concept drift as customer behaviour changes over time?", "difficulty": "medium"},
+            {"question": "How would you build a data lake architecture that supports both batch analytics and real-time streaming use cases?", "follow_up": "How does the Lambda architecture differ from the Kappa architecture and when would you choose each?", "difficulty": "hard"},
+            {"question": "You are asked to build a system that automates the generation of weekly business reports using data from multiple sources. How would you design it?", "follow_up": "How do you handle source data delays and ensure reports are not published with stale or incomplete data?", "difficulty": "medium"},
+            {"question": "Describe the key components you would include in a model monitoring system for a production ML pipeline.", "follow_up": "How do you distinguish between data quality issues upstream and genuine model degradation in your monitoring?", "difficulty": "medium"},
+            {"question": "How would you design a personalisation engine for a news app that shows different content to different users based on their reading history?", "follow_up": "How do you balance personalisation with diversity to avoid filter bubbles?", "difficulty": "hard"},
+            {"question": "What is a data mesh architecture and when would you recommend it over a centralised data warehouse approach?", "follow_up": "What challenges arise when different domain teams each own their own data products in a data mesh?", "difficulty": "hard"},
+            {"question": "Describe how you would design a simple model registry that tracks model versions, their training metadata, and deployment history.", "follow_up": "How does the model registry integrate with your CI/CD pipeline to automate promotion and rollback?", "difficulty": "easy"},
+            {"question": "How would you design an alerting system for a data pipeline that catches data freshness issues before analysts notice them?", "follow_up": "How do you set alert thresholds to minimise false positives without missing real failures?", "difficulty": "easy"},
+        ],
+        "mlops": [
+            {"question": "What does a typical ML deployment pipeline look like for a data science team? Walk me through the steps from model hand-off to production.", "follow_up": "What is the most common point of failure in the handoff between data science and engineering teams during model deployment?", "difficulty": "easy"},
+            {"question": "How do you monitor a deployed ML model in production? What metrics matter most and how do you set thresholds?", "follow_up": "How do you distinguish between model degradation caused by data drift versus a bug in the data pipeline?", "difficulty": "medium"},
+            {"question": "Explain the concept of training/serving skew. How would you detect it in a production system?", "follow_up": "What changes to the feature engineering pipeline are most likely to cause training/serving skew?", "difficulty": "medium"},
+            {"question": "What is MLflow and how would you use it to track experiments, register models, and manage deployments?", "follow_up": "How do you version datasets in MLflow to ensure full experiment reproducibility?", "difficulty": "easy"},
+            {"question": "How would you set up an automated retraining pipeline for a churn prediction model that retrains monthly?", "follow_up": "What validation checks do you run before automatically promoting a retrained model to production?", "difficulty": "medium"},
+            {"question": "What is a blue-green deployment for an ML model and when would you use it?", "follow_up": "How does shadow mode testing differ from a blue-green deployment and what are the relative advantages?", "difficulty": "medium"},
+            {"question": "How would you containerise a scikit-learn model for deployment using Docker? Walk me through the Dockerfile and serving setup.", "follow_up": "How do you manage model dependencies and ensure the production container environment matches training exactly?", "difficulty": "medium"},
+            {"question": "Describe how you would implement data drift detection in production. What statistical tests or metrics would you use?", "follow_up": "How do you handle the case where drift is detected but retraining is not yet possible due to a lack of fresh labels?", "difficulty": "hard"},
+            {"question": "What is the difference between online serving and batch serving for ML models? When is each appropriate?", "follow_up": "How do you handle a model that is too slow for real-time serving but results are needed within seconds?", "difficulty": "easy"},
+            {"question": "How do you design the logging strategy for a production ML model so that you can reconstruct any prediction after the fact?", "follow_up": "What privacy or compliance constraints might affect how you log prediction inputs and outputs?", "difficulty": "medium"},
+            {"question": "What is model quantisation and why is it useful for deploying a large model in production?", "follow_up": "What accuracy degradation is acceptable and how do you measure it before deploying a quantised model?", "difficulty": "hard"},
+            {"question": "How do you implement a canary release strategy when rolling out a new version of an ML model?", "follow_up": "What metrics would trigger an automatic rollback in your canary deployment and how quickly would the rollback occur?", "difficulty": "hard"},
+            {"question": "Describe how you would manage secrets (API keys, database credentials) in a data science deployment pipeline.", "follow_up": "What are the risks of storing secrets in environment variables and what alternatives do you recommend?", "difficulty": "easy"},
+            {"question": "What is model pruning and how can a data scientist use it to reduce inference costs?", "follow_up": "How do you determine how much to prune without significant accuracy loss?", "difficulty": "hard"},
+            {"question": "How would you set up a CI pipeline for a data science project that runs data validation, unit tests, and model quality checks on each commit?", "follow_up": "How do you handle the non-determinism of model training results in an automated test suite?", "difficulty": "hard"},
+            {"question": "What is a feature store and how does it simplify MLOps for a data science team?", "follow_up": "How does a feature store ensure that online and offline features are computed identically?", "difficulty": "medium"},
+            {"question": "Describe the key differences between deploying a scikit-learn model and deploying a PyTorch deep learning model to production.", "follow_up": "What additional infrastructure challenges arise with GPU-based model serving compared to CPU serving?", "difficulty": "easy"},
+        ],
+        "behavioral": [
+            {"question": "Tell me about the most valuable insight you've ever surfaced from data that changed a business decision. How did you communicate it?", "follow_up": "How did you ensure the insight was actionable and that stakeholders followed through on the recommendation?", "difficulty": "medium"},
+            {"question": "Describe a time when your analysis was challenged by a stakeholder who disagreed with your conclusions. How did you handle it?", "follow_up": "What did you do differently afterwards to make your analyses more defensible?", "difficulty": "medium"},
+            {"question": "Tell me about a time when you had to work with very messy or incomplete data. What was your approach and what tradeoffs did you make?", "follow_up": "At what point would you decide the data is too poor to draw reliable conclusions?", "difficulty": "medium"},
+            {"question": "Describe a situation where a model you built went into production and then underperformed. What happened and what did you do?", "follow_up": "What monitoring or safeguards did you put in place to detect the problem and what did you learn for future projects?", "difficulty": "hard"},
+            {"question": "Tell me about a time you had to explain a complex statistical concept to a non-technical stakeholder. How did you approach it?", "follow_up": "How do you adapt your communication style when the audience has varying levels of data literacy?", "difficulty": "easy"},
+            {"question": "Describe a project where you had to make significant analytical decisions under uncertainty or with ambiguous requirements.", "follow_up": "How do you document your assumptions so that others can reproduce and validate your analysis?", "difficulty": "medium"},
+            {"question": "Tell me about a time you identified an ethical concern or potential bias in a dataset or model. What did you do about it?", "follow_up": "How do you build bias auditing into your standard workflow rather than treating it as a one-off check?", "difficulty": "hard"},
+            {"question": "Describe a situation where you disagreed with a technical approach another data scientist on your team was taking. How did you handle it?", "follow_up": "How do you build a team culture where technical debates are productive rather than personal?", "difficulty": "medium"},
+            {"question": "Tell me about a time you had to rapidly learn a new tool, technique, or domain to complete a project. How did you get up to speed?", "follow_up": "What is your framework for deciding how deep to go in learning a new technique versus using a well-understood existing approach?", "difficulty": "easy"},
+            {"question": "Describe a time you collaborated with engineering, product, or business teams to ship a data science solution. What challenges arose?", "follow_up": "How do you manage expectations with non-technical partners around model accuracy and delivery timelines?", "difficulty": "easy"},
+            {"question": "Tell me about the most impactful data science project you have led or contributed to. What made it successful?", "follow_up": "What would you do differently if you started that project today with what you now know?", "difficulty": "medium"},
+            {"question": "Describe a time when you failed to meet a deadline on a data science project. What happened and how did you manage it?", "follow_up": "What systems or habits have you put in place since then to improve your project planning and time management?", "difficulty": "medium"},
+            {"question": "Tell me about a time you had to make a data-driven recommendation that was unpopular with leadership. How did you handle the pushback?", "follow_up": "How do you balance standing by your analysis with being open to information you might have missed?", "difficulty": "hard"},
+            {"question": "How do you stay current with developments in data science and ML? Give a recent example that changed your practice.", "follow_up": "How do you evaluate whether a new methodology is ready to use in a production project versus still being experimental?", "difficulty": "easy"},
+            {"question": "Describe a time you mentored a junior data scientist. What did you focus on and how did you measure progress?", "follow_up": "How do you mentor someone who is technically strong but resistant to feedback on communication or soft skills?", "difficulty": "easy"},
+            {"question": "Tell me about a time you had to deliver a data science project with significantly fewer resources than you needed. How did you adapt?", "follow_up": "How do you prioritise what to cut when scope, time, and budget are all constrained simultaneously?", "difficulty": "hard"},
+            {"question": "Describe a situation where you proactively identified a data quality issue that would have caused problems downstream. What did you do?", "follow_up": "How do you build data quality checks into a pipeline so that issues are caught automatically in the future?", "difficulty": "medium"},
+        ],
     },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ROLE: Software Engineer (SDE)
+    # ══════════════════════════════════════════════════════════════════════════
     "Software Engineer (SDE)": {
-        "leetcode algorithm competitive programming": "data_structures_algorithms",
-        "microservice kubernetes docker aws cloud distributed": "system_design",
-        "refactor review clean code solid tdd": "software_craft",
-        "incident production oncall debugging": "applied",
+        "machine_learning": [
+            {"question": "As a software engineer, how do you integrate a machine learning model into a production backend service? Walk me through the full integration.", "follow_up": "How do you version the model and the API contract together so that changes don't break downstream consumers?", "difficulty": "medium"},
+            {"question": "Explain the difference between online and batch inference. How does your system design differ for each?", "follow_up": "How do you handle model warm-up latency in an online inference service that scales to zero?", "difficulty": "medium"},
+            {"question": "What is the bias-variance tradeoff? As an SDE, why does this concept matter when reviewing a data scientist's model for production?", "follow_up": "How would you detect if a model deployed to production is overfitting to recent traffic patterns?", "difficulty": "easy"},
+            {"question": "How do you ensure that a machine learning model's predictions are deterministic and reproducible in a production system?", "follow_up": "What challenges arise when trying to reproduce a prediction made six months ago for an audit?", "difficulty": "medium"},
+            {"question": "What is A/B testing for ML models and how would you implement it in a backend service?", "follow_up": "How do you prevent contamination between experiment groups when users have multiple sessions?", "difficulty": "medium"},
+            {"question": "Explain what feature engineering is and describe a scenario where a software engineer's contribution to feature design improved model performance.", "follow_up": "How do you coordinate schema changes in feature engineering code between the training pipeline and the serving pipeline?", "difficulty": "easy"},
+            {"question": "How would you build a caching layer for ML model predictions to reduce latency and cost?", "follow_up": "How do you decide the cache TTL and handle cache invalidation when the model is updated?", "difficulty": "medium"},
+            {"question": "What is model drift and what is an SDE's responsibility in detecting and responding to it?", "follow_up": "How would you instrument a prediction service to emit the metrics needed to detect drift?", "difficulty": "medium"},
+            {"question": "How do you write integration tests for a service that wraps an ML model? What are the specific challenges?", "follow_up": "How do you mock or stub the model in unit tests without sacrificing test quality?", "difficulty": "hard"},
+            {"question": "Describe how you would build a system that allows data scientists to deploy and serve models without deep infrastructure knowledge.", "follow_up": "What guard rails and approval processes would you put in place before a model goes live?", "difficulty": "hard"},
+            {"question": "What is shadow mode testing for an ML model and how would you implement it in a microservices architecture?", "follow_up": "How do you store and analyse shadow mode results at scale without impacting production latency?", "difficulty": "hard"},
+            {"question": "Explain how you would handle a situation where a deployed ML model has a memory leak that only manifests under high load.", "follow_up": "What profiling tools would you use and how would you design the rollback strategy?", "difficulty": "hard"},
+            {"question": "What are the key differences between serving a 100MB scikit-learn model and a 10GB large language model in production?", "follow_up": "How does model sharding work and what networking constraints does it introduce?", "difficulty": "hard"},
+            {"question": "How do you manage the lifecycle of a machine learning model from deployment to deprecation in a production system?", "follow_up": "How do you communicate deprecation timelines to downstream teams and enforce retirement of old model versions?", "difficulty": "easy"},
+            {"question": "Describe how you would implement a prediction logging system that captures inputs, outputs, and latency for every model call.", "follow_up": "How do you handle PII in prediction logs and what retention and access controls are required?", "difficulty": "medium"},
+            {"question": "What is the role of a model registry in an ML system and how does it integrate with a CI/CD pipeline?", "follow_up": "How does the model registry help you roll back to a previous model version quickly in an incident?", "difficulty": "easy"},
+            {"question": "How would you expose a machine learning model as a gRPC service? What advantages does gRPC offer over REST for high-throughput inference?", "follow_up": "How do you handle streaming responses in gRPC when the model produces outputs token by token?", "difficulty": "hard"},
+        ],
+        "deep_learning": [
+            {"question": "How does a Transformer model work at a high level? As an SDE, what do you need to understand to build an efficient serving layer for one?", "follow_up": "What is KV caching in transformer inference and how does it reduce computation during generation?", "difficulty": "medium"},
+            {"question": "What is ONNX and how would you use it to serve a PyTorch model in a production system without requiring the full PyTorch runtime?", "follow_up": "What types of PyTorch operations are not ONNX-exportable and how do you handle them?", "difficulty": "medium"},
+            {"question": "Explain batch inference for deep learning models. How does dynamic batching work and how do you implement it in a serving framework like Triton?", "follow_up": "What are the tradeoffs between batching for throughput and maintaining low p99 latency?", "difficulty": "hard"},
+            {"question": "How would you implement model quantisation in a production pipeline? What are the accuracy and latency tradeoffs?", "follow_up": "How do you validate that a quantised model meets the accuracy threshold before rolling it out to production?", "difficulty": "hard"},
+            {"question": "Describe how GPU memory management works and what out-of-memory (OOM) errors mean for a serving system.", "follow_up": "What strategies do you use to maximise the number of concurrent model replicas on a GPU node?", "difficulty": "hard"},
+            {"question": "What is TensorRT and how does it optimise deep learning models for NVIDIA GPU inference?", "follow_up": "What types of precision modes (FP32, FP16, INT8) does TensorRT support and how do you choose between them?", "difficulty": "hard"},
+            {"question": "How do you handle model warm-up in a deep learning serving service? Why does cold-start latency matter and how do you minimise it?", "follow_up": "How does Kubernetes readiness probe configuration interact with model warm-up time?", "difficulty": "medium"},
+            {"question": "What is knowledge distillation and how can an SDE use it to reduce serving costs without the data science team rebuilding the model from scratch?", "follow_up": "What API or contract changes are needed when swapping a large model for its distilled version in production?", "difficulty": "medium"},
+            {"question": "How would you design a system that serves multiple different deep learning models behind a single unified API?", "follow_up": "How do you manage GPU allocation fairly across models with very different load profiles?", "difficulty": "hard"},
+            {"question": "Explain what embeddings are and how a software engineer would use a pre-trained embedding model in a search or recommendation feature.", "follow_up": "How do you update embeddings in a live search index when the embedding model is retrained?", "difficulty": "easy"},
+            {"question": "What is speculative decoding and why is it relevant for LLM serving infrastructure?", "follow_up": "How does the acceptance rate of the draft model affect actual throughput gains in a production system?", "difficulty": "hard"},
+            {"question": "How would you implement streaming token generation for an LLM inference service using Server-Sent Events (SSE) or WebSockets?", "follow_up": "How do you handle client disconnections gracefully without wasting GPU compute on abandoned generation requests?", "difficulty": "medium"},
+            {"question": "Describe the difference between data parallelism and model parallelism for serving large deep learning models.", "follow_up": "When does tensor parallelism become necessary and what are its communication overhead costs?", "difficulty": "hard"},
+            {"question": "How do you load test a deep learning inference service to determine its capacity limits and degradation points?", "follow_up": "What metrics are most important to monitor during a load test and what constitutes a failure condition?", "difficulty": "medium"},
+            {"question": "What are the infrastructure requirements for serving a 70B parameter LLM? How would you estimate GPU and memory needs?", "follow_up": "How does quantisation to 4-bit change the infrastructure requirements and what accuracy loss should you expect?", "difficulty": "hard"},
+            {"question": "Explain how a neural network makes a prediction at a high level. Why does an SDE need to understand the forward pass?", "follow_up": "How does understanding the model architecture help you write better performance tests for the serving layer?", "difficulty": "easy"},
+            {"question": "What is model compilation (e.g., torch.compile, XLA) and how does it improve inference throughput?", "follow_up": "What are the compilation time overheads and how do you handle them in a Kubernetes deployment that scales pods frequently?", "difficulty": "medium"},
+        ],
+        "llm_generative_ai": [
+            {"question": "How would you build a production API that proxies requests to an LLM provider (e.g., OpenAI) with rate limiting, retries, and cost tracking?", "follow_up": "How do you handle provider outages and implement fallback to a secondary provider or a self-hosted model?", "difficulty": "medium"},
+            {"question": "Explain how streaming responses from an LLM API work. How do you implement token streaming in a REST or GraphQL API?", "follow_up": "How do you handle partial responses when a client disconnects mid-stream?", "difficulty": "medium"},
+            {"question": "How would you design a prompt management system that allows product teams to version, test, and deploy prompt changes without code deployments?", "follow_up": "How do you A/B test two prompt variants in production and measure which produces better user outcomes?", "difficulty": "hard"},
+            {"question": "What are the security risks of building a product on top of an LLM, and how do you mitigate prompt injection attacks?", "follow_up": "How do you prevent a malicious user from using prompt injection to exfiltrate data from your system prompt?", "difficulty": "hard"},
+            {"question": "How would you implement a RAG (Retrieval-Augmented Generation) pipeline in a production backend? Describe the components and their interactions.", "follow_up": "How do you handle the latency budget across embedding, retrieval, and generation stages to meet a p99 SLA?", "difficulty": "medium"},
+            {"question": "Describe how function calling (tool use) works in the OpenAI or Anthropic API. How would you implement a multi-step agent loop in a backend service?", "follow_up": "How do you prevent the agent loop from running indefinitely and ensure it fails safely?", "difficulty": "hard"},
+            {"question": "How do you manage and rotate API keys for LLM providers across multiple microservices securely?", "follow_up": "How do you implement per-service spending limits and alerts to avoid unexpected LLM API cost overruns?", "difficulty": "medium"},
+            {"question": "What is a vector database and how do you choose between options like Pinecone, Weaviate, Qdrant, and pgvector for a production application?", "follow_up": "How does pgvector compare to a dedicated vector database in terms of operational complexity and query performance?", "difficulty": "medium"},
+            {"question": "How would you implement conversation history management for a multi-turn LLM chatbot that needs to stay within the context window limit?", "follow_up": "How do you summarise or prune conversation history intelligently without losing critical context?", "difficulty": "medium"},
+            {"question": "How do you cache LLM responses to reduce API costs and latency without serving stale or incorrect results?", "follow_up": "What hashing strategy do you use for semantic caching when two different prompts ask the same question with different wording?", "difficulty": "hard"},
+            {"question": "What is the difference between a synchronous and asynchronous LLM API call in a backend service? When would you use a job queue?", "follow_up": "How do you notify the client when an async LLM job completes — webhooks, polling, or WebSockets?", "difficulty": "easy"},
+            {"question": "How would you implement content moderation for user inputs and LLM outputs in a production system?", "follow_up": "How do you handle the latency cost of moderation checks without degrading user experience?", "difficulty": "medium"},
+            {"question": "Explain how token counting works and why it matters for cost management in a production LLM application.", "follow_up": "How do you implement a per-user or per-organisation token budget and enforce it in real time?", "difficulty": "easy"},
+            {"question": "How do you test an LLM-powered feature in your CI pipeline when the model responses are non-deterministic?", "follow_up": "How do you use snapshot testing or golden sets to catch regressions in LLM feature quality?", "difficulty": "hard"},
+            {"question": "What is an AI gateway and what features does it provide beyond simple API proxying?", "follow_up": "How would you implement request deduplication in an AI gateway to avoid charging users twice for the same request?", "difficulty": "hard"},
+            {"question": "Describe the basic architecture of an LLM-powered code assistant that suggests completions in an IDE plugin.", "follow_up": "How do you minimise the perceived latency of code suggestions so they feel instant to the developer?", "difficulty": "easy"},
+            {"question": "How would you implement observability for an LLM-powered feature — what do you log, trace, and monitor?", "follow_up": "How do you correlate LLM API calls with user sessions for debugging a specific user complaint?", "difficulty": "medium"},
+        ],
+        "python_coding": [
+            {"question": "Explain the time and space complexity of common data structures in Python: list, dict, set, and deque. When would you choose each?", "follow_up": "How does Python's dict implementation differ from a hash map in lower-level languages, and what are the performance implications?", "difficulty": "easy"},
+            {"question": "How does Python's GIL affect a multi-threaded web server handling concurrent requests? How do async frameworks like FastAPI or asyncio work around it?", "follow_up": "How do you share state safely between concurrent async tasks without using locks?", "difficulty": "medium"},
+            {"question": "Write a Python function to implement a rate limiter using the token bucket algorithm.", "follow_up": "How would you implement this rate limiter to work across multiple distributed processes sharing a Redis instance?", "difficulty": "hard"},
+            {"question": "Explain how Python's `asyncio` event loop works. How do you run CPU-bound and I/O-bound tasks efficiently in the same async application?", "follow_up": "What is `asyncio.run_in_executor` and when would you use it?", "difficulty": "hard"},
+            {"question": "How would you design and implement a job queue in Python using Celery and Redis? What are the key configuration choices?", "follow_up": "How do you handle task failures, retries, and dead letter queues in Celery?", "difficulty": "hard"},
+            {"question": "Explain how Python generators work and give a real-world example from backend engineering where they provide a clear benefit.", "follow_up": "How do you use a generator to stream a large database result set to an HTTP response without buffering the full result?", "difficulty": "medium"},
+            {"question": "How do you write effective unit and integration tests for a Python microservice? What is your testing pyramid strategy?", "follow_up": "How do you use pytest fixtures and mock objects to isolate tests from external dependencies like databases and APIs?", "difficulty": "medium"},
+            {"question": "What are Python decorators and how are they used in a web framework context? Write a decorator that enforces authentication on an endpoint.", "follow_up": "How do you make a decorator that can be used with or without arguments?", "difficulty": "medium"},
+            {"question": "How do you implement efficient pagination for a REST API endpoint that returns a large dataset from a database?", "follow_up": "What are the tradeoffs between offset-based and cursor-based pagination and when is each appropriate?", "difficulty": "medium"},
+            {"question": "Explain how connection pooling works in Python for database connections. What happens if the pool is exhausted?", "follow_up": "How do you tune pool size for a Python web service with async database access?", "difficulty": "medium"},
+            {"question": "How would you implement a circuit breaker pattern in Python for calls to an external ML inference API?", "follow_up": "What state transitions exist in a circuit breaker and how do you handle the half-open state?", "difficulty": "hard"},
+            {"question": "Describe how you would use dataclasses and Pydantic in a FastAPI service to define request/response schemas and validate inputs.", "follow_up": "How does Pydantic V2 differ from V1 and what migration challenges have you encountered?", "difficulty": "easy"},
+            {"question": "How do you implement structured logging in a Python microservice and what fields should every log entry contain?", "follow_up": "How do you propagate a correlation ID through a distributed system for end-to-end request tracing?", "difficulty": "medium"},
+            {"question": "Explain how Python's memory management works for large objects. What are common causes of memory leaks in a long-running Python service?", "follow_up": "How would you profile memory usage in a production Python service without causing significant overhead?", "difficulty": "hard"},
+            {"question": "How would you implement a simple in-process cache in Python that is safe for concurrent access in an async web server?", "follow_up": "What are the tradeoffs between TTL-based expiry and LRU eviction for an inference result cache?", "difficulty": "medium"},
+            {"question": "What are Python type hints and how do tools like mypy improve code quality in a large engineering team?", "follow_up": "How do you incrementally add type hints to a large existing codebase without breaking existing functionality?", "difficulty": "easy"},
+            {"question": "How would you implement a health check endpoint for a Python web service that serves an ML model?", "follow_up": "What is the difference between a liveness check and a readiness check in Kubernetes, and how do you implement each?", "difficulty": "easy"},
+        ],
+        "system_design": [
+            {"question": "Design a URL shortening service like bit.ly. Walk me through your architecture, database schema, and scaling strategy.", "follow_up": "How does your design handle a viral URL that suddenly receives 10 million hits in an hour?", "difficulty": "medium"},
+            {"question": "Design a distributed message queue like Kafka. What are the key components and how do you ensure message ordering and exactly-once delivery?", "follow_up": "How does Kafka's consumer group mechanism enable parallel consumption while maintaining partition ordering?", "difficulty": "hard"},
+            {"question": "How would you design a real-time notification system that delivers push notifications to 100 million mobile users?", "follow_up": "How do you handle users who are offline and reconnect later — how are missed notifications delivered?", "difficulty": "hard"},
+            {"question": "Design a rate limiting service that can be shared across multiple microservices. What algorithms and data structures would you use?", "follow_up": "How do you implement distributed rate limiting across multiple API gateway nodes sharing Redis?", "difficulty": "hard"},
+            {"question": "Design an API gateway for a microservices architecture. What features does it need to include?", "follow_up": "How does the API gateway handle service discovery when backend services scale up and down dynamically?", "difficulty": "medium"},
+            {"question": "How would you design a distributed cache layer using Redis for a high-traffic e-commerce site?", "follow_up": "How do you handle cache stampede when a popular key expires and thousands of requests hit the database simultaneously?", "difficulty": "medium"},
+            {"question": "Design a system to handle 1 million concurrent WebSocket connections for a real-time chat application.", "follow_up": "How do you route messages between users connected to different server instances?", "difficulty": "hard"},
+            {"question": "How would you design a database schema and backend for a social media feed feature that shows posts from people you follow?", "follow_up": "How does the fan-out strategy differ between push and pull models for generating feeds, and which does Twitter use?", "difficulty": "hard"},
+            {"question": "Design a file storage system like Dropbox or Google Drive. What are the key components for upload, sync, and sharing?", "follow_up": "How do you handle concurrent edits to the same file from multiple devices?", "difficulty": "hard"},
+            {"question": "How would you design a search autocomplete feature that suggests results in real time as the user types?", "follow_up": "How do you personalise autocomplete suggestions based on the user's search history without adding significant latency?", "difficulty": "medium"},
+            {"question": "Design a distributed job scheduler like Airflow for running data pipelines. What are the core components?", "follow_up": "How do you ensure exactly-once execution of a scheduled job even if the scheduler node crashes mid-execution?", "difficulty": "hard"},
+            {"question": "How would you design an OAuth 2.0 authentication system from scratch? What are the key flows and security considerations?", "follow_up": "How do you implement token rotation and revocation in a stateless JWT-based system?", "difficulty": "hard"},
+            {"question": "Design a simple key-value store that supports GET, PUT, and DELETE operations with high availability. What tradeoffs do you make on the CAP theorem?", "follow_up": "How does consistent hashing distribute keys across nodes and what happens during node failure or addition?", "difficulty": "medium"},
+            {"question": "How would you design a logging and monitoring system for a fleet of 500 microservices?", "follow_up": "How do you implement distributed tracing using OpenTelemetry and correlate logs across service boundaries?", "difficulty": "medium"},
+            {"question": "Describe the architecture of a content delivery network (CDN). How does it work and when would you put an ML model inference endpoint behind one?", "follow_up": "What is edge computing and how does it enable ML inference to run closer to the user?", "difficulty": "easy"},
+            {"question": "What is eventual consistency and how do you design a system that tolerates it? Give a concrete example.", "follow_up": "How does the SAGA pattern handle distributed transactions in a system that cannot use two-phase commit?", "difficulty": "hard"},
+            {"question": "Design a simple REST API for a task management application. What endpoints, HTTP methods, and status codes would you define?", "follow_up": "How would you version this API and ensure backwards compatibility as it evolves?", "difficulty": "easy"},
+        ],
+        "mlops": [
+            {"question": "As an SDE, what is your role in deploying an ML model to production? How do you collaborate with the data science team?", "follow_up": "What information do you need from data scientists to build a reliable serving layer for their model?", "difficulty": "easy"},
+            {"question": "How would you containerise a Python-based ML inference service using Docker and deploy it to Kubernetes?", "follow_up": "How do you configure liveness, readiness, and startup probes for a model serving pod in Kubernetes?", "difficulty": "medium"},
+            {"question": "Describe how you would set up a CI/CD pipeline for a service that serves an ML model using GitHub Actions and Kubernetes.", "follow_up": "How do you run model quality regression tests automatically as part of the pipeline before deploying?", "difficulty": "medium"},
+            {"question": "How do you implement canary deployments for an ML model serving service? Walk through the deployment steps.", "follow_up": "What automated checks trigger a rollback in your canary deployment and how quickly do they execute?", "difficulty": "hard"},
+            {"question": "What is model monitoring and how do you instrument a serving API to detect prediction distribution shifts?", "follow_up": "How do you set up alerts that page on-call engineers when model performance degrades below a threshold?", "difficulty": "medium"},
+            {"question": "How would you design the infrastructure for a serving system that needs to scale from 10 to 10,000 requests per second automatically?", "follow_up": "What metrics do you use to trigger horizontal scaling and how do you avoid oscillation in the autoscaler?", "difficulty": "hard"},
+            {"question": "Explain the difference between blue-green and rolling deployments for a model serving service. When would you use each?", "follow_up": "How do you handle in-flight requests during a rolling deployment to prevent users from hitting both old and new model versions?", "difficulty": "medium"},
+            {"question": "What is infrastructure as code (IaC) and how would you use Terraform or Pulumi to provision an ML serving infrastructure?", "follow_up": "How do you manage secrets and sensitive configuration in Terraform without storing them in version control?", "difficulty": "medium"},
+            {"question": "How would you set up distributed tracing for a multi-service ML inference pipeline using OpenTelemetry?", "follow_up": "How do you sample traces to limit overhead without losing visibility into tail latency issues?", "difficulty": "hard"},
+            {"question": "Describe how you would implement a feature flag system to control which model version is used by different user segments.", "follow_up": "How do you implement gradual rollouts with feature flags and measure their impact?", "difficulty": "medium"},
+            {"question": "How would you implement a health monitoring system that detects when a GPU is underutilised in a model serving cluster?", "follow_up": "What autoscaling strategies maximise GPU utilisation while meeting latency SLAs for variable inference workloads?", "difficulty": "hard"},
+            {"question": "What is service mesh (e.g., Istio) and how does it help with observability and traffic management for ML serving services?", "follow_up": "How does mTLS in a service mesh improve security between model serving components?", "difficulty": "hard"},
+            {"question": "How do you manage secrets like model registry credentials and API keys in a Kubernetes-deployed ML service?", "follow_up": "What is the difference between Kubernetes Secrets and a dedicated secrets manager like HashiCorp Vault?", "difficulty": "easy"},
+            {"question": "What is the purpose of a model registry and how does it integrate into a CI/CD pipeline for ML deployments?", "follow_up": "How do you enforce that only approved model versions from the registry are deployed to production?", "difficulty": "easy"},
+            {"question": "How would you implement rate limiting for an ML inference API to prevent abuse and ensure fair resource allocation?", "follow_up": "How do you implement tiered rate limits for free and paid users in a multi-tenant ML serving platform?", "difficulty": "medium"},
+            {"question": "Describe how you would implement cost attribution for ML inference across different teams or products in a shared Kubernetes cluster.", "follow_up": "How do you use Kubernetes resource quotas and limit ranges to prevent one team from monopolising cluster resources?", "difficulty": "hard"},
+            {"question": "What is observability in the context of ML systems and how does it differ from traditional software observability?", "follow_up": "What additional metrics (beyond latency, throughput, and error rate) are critical for an ML serving system?", "difficulty": "easy"},
+        ],
+        "behavioral": [
+            {"question": "Tell me about the most complex engineering system you've designed or built. What were the hardest design decisions?", "follow_up": "If you were starting that project today, what would you do differently and why?", "difficulty": "medium"},
+            {"question": "Describe a time when you discovered a critical production bug. How did you diagnose, communicate, and resolve it?", "follow_up": "What post-mortem process did you follow and what changes did you make to prevent a recurrence?", "difficulty": "hard"},
+            {"question": "Tell me about a time you had to make a significant technical decision without having all the information you needed. How did you approach it?", "follow_up": "What framework do you use to make decisions under uncertainty in engineering?", "difficulty": "medium"},
+            {"question": "Describe a time you disagreed with your tech lead or engineering manager about a technical approach. How did you handle it?", "follow_up": "How do you decide when to defer to others' decisions versus when to escalate a technical disagreement?", "difficulty": "medium"},
+            {"question": "Tell me about a project where you had to significantly refactor or re-architect existing code. How did you approach it safely?", "follow_up": "How did you maintain feature delivery while the refactor was in progress?", "difficulty": "hard"},
+            {"question": "Describe a time you had to collaborate with a data science team as a software engineer. What challenges arose and how did you bridge the gap?", "follow_up": "What documentation or processes did you put in place to improve future collaboration?", "difficulty": "easy"},
+            {"question": "Tell me about the most valuable performance optimisation you've implemented. How did you identify the bottleneck and measure the improvement?", "follow_up": "How do you ensure that a performance optimisation doesn't introduce correctness bugs or regressions?", "difficulty": "medium"},
+            {"question": "Describe a time you had to onboard a complex codebase you had never seen before. How did you get up to speed quickly?", "follow_up": "What strategies do you use to document and improve code comprehension for engineers who come after you?", "difficulty": "easy"},
+            {"question": "Tell me about a time you mentored a junior engineer. What did you focus on and how did you know you were being effective?", "follow_up": "How do you adapt your mentoring approach for engineers at different experience levels?", "difficulty": "easy"},
+            {"question": "Describe a time when a project you were leading started falling behind schedule. How did you respond?", "follow_up": "How do you communicate project delays to stakeholders without damaging trust?", "difficulty": "medium"},
+            {"question": "Tell me about an experience where you had to advocate for technical quality (testing, documentation, refactoring) against pressure to ship faster.", "follow_up": "How do you quantify the business cost of technical debt to make the case to product leadership?", "difficulty": "medium"},
+            {"question": "Describe a time you built something that turned out to be the wrong solution. How did you identify the mismatch and what did you do?", "follow_up": "What process changes did you introduce to better validate requirements before starting significant engineering work?", "difficulty": "hard"},
+            {"question": "Tell me about a time you worked on a cross-functional project involving both engineering and ML or data science teams. What was your role?", "follow_up": "How did you manage dependencies between teams and avoid blockers?", "difficulty": "medium"},
+            {"question": "How do you stay current with engineering and technology trends? Give a recent example that influenced your work.", "follow_up": "How do you evaluate whether a new technology or framework is ready for production use?", "difficulty": "easy"},
+            {"question": "Describe a time you had to write documentation or runbooks for a complex system. What made the documentation effective?", "follow_up": "How do you keep documentation up to date as the system evolves?", "difficulty": "easy"},
+            {"question": "Tell me about a time you had to deal with an ambiguous or underspecified technical requirement. How did you clarify it?", "follow_up": "How do you balance asking for clarification versus making reasonable assumptions and moving forward?", "difficulty": "medium"},
+            {"question": "Describe a time you had to influence a team to adopt a new engineering practice or tool. How did you get buy-in?", "follow_up": "How do you handle team members who are resistant to change or sceptical of new approaches?", "difficulty": "hard"},
+        ],
     },
-    "ML Engineer": {
-        "mlflow kubeflow airflow pipeline deploy": "mlops",
-        "kubernetes docker triton onnx serving inference": "infrastructure",
-        "model training fine-tune transfer": "ml_fundamentals",
-        "production incident rollback": "applied",
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ROLE: Machine Learning Engineer
+    # ══════════════════════════════════════════════════════════════════════════
+    "Machine Learning Engineer": {
+        "machine_learning": [
+            {"question": "Walk me through your process for taking a raw dataset and producing a production-ready model, from EDA to evaluation.", "follow_up": "How do you decide when a model is good enough to ship, and who else is involved in that decision?", "difficulty": "medium"},
+            {"question": "Explain the bias-variance tradeoff and describe how it manifests differently in a 7B parameter language model versus a logistic regression.", "follow_up": "What does double descent imply about the relationship between model complexity and generalisation?", "difficulty": "hard"},
+            {"question": "How do you perform feature selection for a high-dimensional tabular dataset? Walk me through at least three techniques.", "follow_up": "How does recursive feature elimination differ from feature importance from a gradient boosted tree?", "difficulty": "medium"},
+            {"question": "What is cross-validation and why is it necessary? Describe three variants and when each is appropriate.", "follow_up": "How do you implement time-series aware cross-validation to prevent data leakage?", "difficulty": "easy"},
+            {"question": "How would you handle a class imbalance of 1:500 in a fraud detection problem end-to-end?", "follow_up": "Why is it incorrect to oversample before splitting into train and test sets?", "difficulty": "medium"},
+            {"question": "Explain how XGBoost works internally. What makes it more efficient than a vanilla gradient boosted tree?", "follow_up": "How does XGBoost handle missing values natively and what does it imply about your preprocessing pipeline?", "difficulty": "medium"},
+            {"question": "What is Bayesian optimisation for hyperparameter search? How does it differ from random search in practice?", "follow_up": "What acquisition function would you choose when your model is very expensive to evaluate, and why?", "difficulty": "hard"},
+            {"question": "Describe three evaluation metrics beyond accuracy and explain the business context that makes each most appropriate.", "follow_up": "How do you choose the optimal decision threshold for a binary classifier in a production context?", "difficulty": "easy"},
+            {"question": "How do SHAP values work and how would you use them to explain a tree-based model to a business stakeholder?", "follow_up": "In what scenario can SHAP values be misleading for feature importance?", "difficulty": "hard"},
+            {"question": "What is data leakage in machine learning? Give three concrete examples of how it occurs in a production ML pipeline.", "follow_up": "How do you set up your pipeline using scikit-learn Pipelines to prevent leakage mechanically?", "difficulty": "medium"},
+            {"question": "How does transfer learning work and when would you use it on a tabular dataset versus image or text data?", "follow_up": "What is catastrophic forgetting and how do you mitigate it when fine-tuning a model on new data?", "difficulty": "hard"},
+            {"question": "Explain regularisation techniques: L1, L2, elastic net, and dropout. What are the mechanistic differences and when do you prefer each?", "follow_up": "Why does L1 produce sparse solutions and how is this useful in practice?", "difficulty": "medium"},
+            {"question": "How do you approach a multi-label classification problem where each sample can have multiple correct labels simultaneously?", "follow_up": "How does the loss function need to change compared to standard multi-class classification?", "difficulty": "hard"},
+            {"question": "What is the purpose of a validation set versus a test set? What mistakes do engineers commonly make with these splits?", "follow_up": "How do you maintain a clean holdout test set over time when the model is retrained frequently?", "difficulty": "easy"},
+            {"question": "Explain how principal component analysis (PCA) works. When would you apply it before training a model?", "follow_up": "How does PCA for dimensionality reduction differ in spirit from autoencoders?", "difficulty": "easy"},
+            {"question": "How would you build a model that must perform well across different demographic subgroups with different data distributions?", "follow_up": "What metrics and techniques help ensure fairness and equitable performance across subgroups?", "difficulty": "hard"},
+            {"question": "What is the difference between online learning and batch learning? Describe a real-world ML use case where online learning is necessary.", "follow_up": "How do you evaluate and validate a model trained with online learning when you cannot do a clean train/test split?", "difficulty": "medium"},
+        ],
+        "deep_learning": [
+            {"question": "Explain how the Transformer architecture works from the attention mechanism through to the final output layer.", "follow_up": "What is the quadratic complexity problem of self-attention and how do efficient attention mechanisms like FlashAttention address it?", "difficulty": "hard"},
+            {"question": "Describe the forward and backward pass in a neural network. How does automatic differentiation (autograd) work in PyTorch?", "follow_up": "What is the computational graph in PyTorch and how does `detach()` affect gradient flow?", "difficulty": "medium"},
+            {"question": "What is batch normalisation, how does it work, and why does it speed up training? What are its limitations?", "follow_up": "Why is layer normalisation preferred in Transformers and what happens to batch norm statistics at inference time?", "difficulty": "medium"},
+            {"question": "How do you debug a deep learning model that is not converging? What do you check first?", "follow_up": "What does a plot of gradient norms during training tell you and what actions do you take?", "difficulty": "medium"},
+            {"question": "Explain the concept of positional encoding in Transformers. Compare sinusoidal, learned, and rotary (RoPE) approaches.", "follow_up": "How does RoPE enable better length extrapolation at inference time compared to absolute positional encoding?", "difficulty": "hard"},
+            {"question": "How does mixed precision training work in PyTorch using torch.cuda.amp? What is the role of gradient scaling?", "follow_up": "In what layer types does FP16 precision cause numerical issues and how do you handle them?", "difficulty": "hard"},
+            {"question": "What is knowledge distillation? Describe how you would distil a large transformer model into a smaller one for production.", "follow_up": "How does the temperature hyperparameter in distillation loss affect the soft targets and training dynamics?", "difficulty": "hard"},
+            {"question": "Explain the difference between CNNs and Vision Transformers (ViTs). What data regime favours each?", "follow_up": "What is the role of patch size in ViT and how does it affect computational cost?", "difficulty": "medium"},
+            {"question": "How do residual connections in ResNets prevent vanishing gradients? Explain the gradient flow through a skip connection.", "follow_up": "How does the initialisation strategy change when adding residual connections compared to a plain deep network?", "difficulty": "medium"},
+            {"question": "What is the difference between pre-training, fine-tuning, and probing in the context of foundation models?", "follow_up": "How do you decide how many layers to freeze when fine-tuning a large pretrained model with limited labelled data?", "difficulty": "medium"},
+            {"question": "Describe how you would train a model for a new vision task with only 200 labelled examples. What techniques would you apply?", "follow_up": "How does data augmentation interact with the choice of loss function and regularisation in low-data regimes?", "difficulty": "hard"},
+            {"question": "What are GAN training instabilities and how do Wasserstein GAN and gradient penalty address them?", "follow_up": "When does mode collapse occur and what architectural or training modifications help prevent it?", "difficulty": "hard"},
+            {"question": "How do diffusion models work at a conceptual level? How do they compare to VAEs and GANs for image generation?", "follow_up": "What is classifier-free guidance and how does its scale hyperparameter affect the quality-diversity tradeoff?", "difficulty": "hard"},
+            {"question": "Explain dropout as a regularisation technique. How does MC Dropout enable uncertainty estimation at inference time?", "follow_up": "What are the limitations of MC Dropout as a Bayesian approximation?", "difficulty": "medium"},
+            {"question": "What is the purpose of weight initialisation in deep networks? Explain He and Xavier initialisation.", "follow_up": "What happens to gradient magnitudes at initialisation without proper initialisation in a very deep network?", "difficulty": "easy"},
+            {"question": "How do you implement gradient checkpointing in PyTorch and when is it necessary?", "follow_up": "What is the memory vs compute tradeoff when using gradient checkpointing during training?", "difficulty": "hard"},
+            {"question": "What is an embedding and how would you train task-specific embeddings from scratch for a domain-specific NLP problem?", "follow_up": "How do contextual embeddings from BERT differ from static embeddings like GloVe and when does that difference matter?", "difficulty": "easy"},
+        ],
+        "llm_generative_ai": [
+            {"question": "Explain the difference between pre-training, supervised fine-tuning (SFT), and RLHF for large language models.", "follow_up": "What is DPO (Direct Preference Optimisation) and how does it simplify the RLHF training pipeline?", "difficulty": "hard"},
+            {"question": "How does LoRA work and what are the key hyperparameters (rank, alpha, target modules) that you need to tune?", "follow_up": "How does QLoRA reduce GPU memory during fine-tuning and what quantisation scheme does it use?", "difficulty": "hard"},
+            {"question": "Design an end-to-end RAG pipeline for a legal document Q&A system. What retrieval and generation choices matter most?", "follow_up": "How do you evaluate whether your RAG system is retrieval-limited or generation-limited, and how do you fix each?", "difficulty": "medium"},
+            {"question": "How does the attention mechanism in a decoder-only model like GPT differ from an encoder-decoder model like T5?", "follow_up": "What tasks fundamentally require an encoder-decoder architecture and cannot be solved with a decoder-only model?", "difficulty": "medium"},
+            {"question": "Explain how vector databases work and compare HNSW, IVF, and PQ indexing strategies.", "follow_up": "How do you tune the recall-latency tradeoff for a production retrieval system with strict p99 latency requirements?", "difficulty": "hard"},
+            {"question": "What is speculative decoding and how does it speed up LLM inference? What are the constraints on the draft model?", "follow_up": "How does the acceptance rate of draft tokens change for different task types and model families?", "difficulty": "hard"},
+            {"question": "How would you evaluate an LLM fine-tuned for a specific task without extensive human annotation? What automated metrics and frameworks would you use?", "follow_up": "What are the risks of using LLM-as-a-judge evaluation and how do you mitigate position and verbosity bias?", "difficulty": "medium"},
+            {"question": "Explain prompt engineering techniques: chain-of-thought, few-shot, self-consistency, and tree-of-thoughts. When does each help?", "follow_up": "How does the order of few-shot examples affect model performance and why?", "difficulty": "easy"},
+            {"question": "How does tokenisation work in LLMs? Explain BPE and how vocabulary size affects model capabilities.", "follow_up": "Why do LLMs struggle with character-level tasks despite performing well on language tasks, and what does this reveal?", "difficulty": "easy"},
+            {"question": "What is constitutional AI and how does it differ from RLHF in building aligned language models?", "follow_up": "What are the remaining failure modes of current alignment techniques that constitutional AI does not fully address?", "difficulty": "hard"},
+            {"question": "How would you build an LLM-powered agent using the ReAct pattern? What tools and safeguards are needed?", "follow_up": "How do you prevent the agent from entering a reasoning loop that burns through your token budget?", "difficulty": "medium"},
+            {"question": "What is hallucination in LLMs, what causes it mechanistically, and how do you reduce it in a production system?", "follow_up": "How would you build an automated pipeline to detect and flag hallucinated responses before they reach users?", "difficulty": "hard"},
+            {"question": "How does context window management work for very long document tasks? Describe three strategies for handling inputs beyond the context limit.", "follow_up": "What is the difference between retrieval-augmented context and techniques like sliding window attention?", "difficulty": "medium"},
+            {"question": "Explain the key differences between open-source LLMs (LLaMA, Mistral) and closed API models (GPT-4, Claude) for production use.", "follow_up": "What criteria would you use to choose between on-premise OSS models and closed API models for a regulated industry?", "difficulty": "medium"},
+            {"question": "What is function calling / tool use in LLM APIs? How would you design a safe multi-step tool pipeline?", "follow_up": "How do you handle cases where the LLM calls a tool with incorrect parameters and the tool returns an error?", "difficulty": "medium"},
+            {"question": "How does temperature sampling affect LLM output? Explain the relationship between temperature, top-p, and top-k sampling.", "follow_up": "How do you tune these parameters for a code generation use case versus a creative writing use case?", "difficulty": "easy"},
+            {"question": "What is instruction tuning and how does it transform a base LLM into an instruction-following assistant?", "follow_up": "How do you construct a high-quality instruction-following dataset for fine-tuning and what makes examples effective?", "difficulty": "medium"},
+        ],
+        "python_coding": [
+            {"question": "How would you implement an efficient custom PyTorch Dataset and DataLoader for training on a large image dataset that doesn't fit in memory?", "follow_up": "How do you use multiple workers and pin_memory to maximise GPU utilisation during training?", "difficulty": "medium"},
+            {"question": "Explain how Python's GIL affects a PyTorch training loop and how DataLoader workers bypass it.", "follow_up": "What are the pitfalls of using shared memory between DataLoader workers for large tensors?", "difficulty": "hard"},
+            {"question": "Write a Python function that computes cosine similarity between a query vector and a matrix of 1 million vectors efficiently.", "follow_up": "How does the implementation change when you need to run 500 queries per second on a CPU-only server?", "difficulty": "medium"},
+            {"question": "How would you implement a decorator in Python that profiles GPU memory usage before and after a function call?", "follow_up": "How do you handle GPU memory fragmentation and what PyTorch APIs help you diagnose it?", "difficulty": "hard"},
+            {"question": "Describe how you would implement a training script in PyTorch that is resumable from a checkpoint after a failure.", "follow_up": "What state must be saved in a checkpoint to exactly resume training, including optimizer state and random seeds?", "difficulty": "medium"},
+            {"question": "How do Python generators and iterators work? Give a concrete ML example where a generator pipeline avoids loading all training data into memory.", "follow_up": "How would you implement a generator that fetches data from S3 and preprocesses it on-the-fly during training?", "difficulty": "medium"},
+            {"question": "Explain asyncio in Python and describe a use case in an ML pipeline where async improves throughput.", "follow_up": "How do you call a CPU-bound preprocessing function from inside an async ML pipeline without blocking the event loop?", "difficulty": "hard"},
+            {"question": "How would you implement a context manager that automatically moves a PyTorch model to GPU and back after use?", "follow_up": "How does context manager nesting work and how do you handle exceptions inside the `with` block?", "difficulty": "medium"},
+            {"question": "How would you build a Python library for ML experiment configuration using dataclasses or Pydantic?", "follow_up": "How do you support composing configurations from multiple files and environment variable overrides?", "difficulty": "hard"},
+            {"question": "Write a Python function that implements early stopping for a training loop, with patience and minimum improvement threshold.", "follow_up": "How do you save the best model checkpoint without overwriting it on every epoch?", "difficulty": "easy"},
+            {"question": "Explain Python's memory model and describe two common memory leak patterns in ML training code.", "follow_up": "How do you use objgraph or tracemalloc to identify and fix memory leaks in a training script?", "difficulty": "hard"},
+            {"question": "How would you implement a data validation step in Python that checks feature distributions before training a model?", "follow_up": "How do you use Great Expectations or Pandera to codify data contracts in an ML pipeline?", "difficulty": "medium"},
+            {"question": "What are Python metaclasses and can you give a realistic example from an ML framework where they are used?", "follow_up": "How does `__init_subclass__` offer a simpler alternative to metaclasses for plugin registration?", "difficulty": "hard"},
+            {"question": "How do you profile a slow training script to identify whether the bottleneck is the model forward pass, data loading, or I/O?", "follow_up": "How do you use PyTorch Profiler to identify kernel-level bottlenecks on GPU?", "difficulty": "hard"},
+            {"question": "What are Python type hints and how do tools like mypy help catch bugs in ML pipeline code?", "follow_up": "How would you type hint a function that returns either a numpy array or a PyTorch tensor depending on an input flag?", "difficulty": "easy"},
+            {"question": "How would you implement a Hydra or similar config system for managing ML experiment configurations?", "follow_up": "How do you integrate config management with experiment tracking tools like MLflow or Weights & Biases?", "difficulty": "medium"},
+            {"question": "Explain the difference between deepcopy and shallow copy in Python. Give an ML example where using the wrong one causes a subtle bug.", "follow_up": "How do you safely copy a PyTorch model to create an independent copy for model ensemble methods?", "difficulty": "easy"},
+        ],
+        "system_design": [
+            {"question": "Design a real-time ML inference system that serves 50,000 requests per second with p99 latency under 20ms. Walk me through the architecture.", "follow_up": "How does your design change if 30% of requests require GPU and 70% can be served by CPU?", "difficulty": "hard"},
+            {"question": "Design a scalable model training platform for a team of 50 ML engineers running 500 training jobs per week.", "follow_up": "How do you implement fair scheduling so that one team's large training jobs don't starve smaller experiments?", "difficulty": "hard"},
+            {"question": "How would you design a feature store that supports both offline model training and online inference with point-in-time correctness?", "follow_up": "How does the feature store prevent training/serving skew when features are computed differently in the two environments?", "difficulty": "hard"},
+            {"question": "Design a continuous training pipeline that retrains a ranking model daily using fresh user interaction data.", "follow_up": "How do you validate the newly trained model before automatically promoting it to production?", "difficulty": "medium"},
+            {"question": "How would you design the architecture for an LLM-powered internal knowledge base assistant that serves 5,000 employees?", "follow_up": "How do you handle access control so that employees only retrieve documents they are authorised to see?", "difficulty": "medium"},
+            {"question": "Design an MLOps platform that enables self-serve model deployment for data scientists without infrastructure expertise.", "follow_up": "What guardrails and approval gates do you build in to prevent poorly tested models from going to production?", "difficulty": "hard"},
+            {"question": "How would you design a data pipeline that ingests real-time user event streams and makes features available for online inference within 100ms?", "follow_up": "How do you handle late-arriving events and ensure feature consistency between online and offline computation?", "difficulty": "hard"},
+            {"question": "Design a distributed hyperparameter search system that efficiently explores a large search space across 100 GPU nodes.", "follow_up": "How does population-based training (PBT) differ from sequential Bayesian optimisation for distributed hyperparameter search?", "difficulty": "hard"},
+            {"question": "How would you design a model evaluation framework that tracks model performance across multiple dimensions (accuracy, latency, fairness, cost) over time?", "follow_up": "How do you implement automatic regression detection when a new model version degrades on any tracked dimension?", "difficulty": "medium"},
+            {"question": "Design a recommendation system for a streaming platform with 100 million users. Walk through candidate retrieval, ranking, and post-ranking.", "follow_up": "How do you handle the explore-exploit tradeoff in recommendation to balance showing known-good content versus discovering user preferences?", "difficulty": "hard"},
+            {"question": "How would you design a shadow testing infrastructure that routes a fraction of production traffic to a new model without impacting user experience?", "follow_up": "How do you store and analyse shadow mode results at scale to make a reliable promotion decision?", "difficulty": "medium"},
+            {"question": "Describe the architecture of an ML system for real-time personalisation that adapts to user behaviour within a session.", "follow_up": "How do you balance freshness of in-session signals with the stability of longer-term user preference models?", "difficulty": "hard"},
+            {"question": "How would you design a multi-arm bandit system for online model selection? Compare it to traditional A/B testing.", "follow_up": "How does Thompson Sampling work and what are its convergence properties compared to UCB?", "difficulty": "hard"},
+            {"question": "Design a document ingestion and embedding pipeline for a RAG system that processes 1 million new documents per day.", "follow_up": "How do you handle duplicate and near-duplicate documents so they don't pollute the vector index?", "difficulty": "medium"},
+            {"question": "What are the key components of an ML metadata and lineage tracking system? What should it record?", "follow_up": "How does metadata lineage help you debug a production incident where a model's predictions suddenly degraded?", "difficulty": "medium"},
+            {"question": "Design a simple offline batch prediction pipeline for a model that scores 10 million customers every night.", "follow_up": "How do you make the pipeline resilient to partial failures and ensure idempotent execution on retry?", "difficulty": "easy"},
+            {"question": "How do you architect a multi-region ML serving deployment that meets data residency requirements for GDPR compliance?", "follow_up": "How do you keep model weights synchronised across regions while respecting data transfer restrictions?", "difficulty": "hard"},
+        ],
+        "mlops": [
+            {"question": "Walk me through how you deploy a PyTorch model from a research environment to a production REST API, step by step.", "follow_up": "What is your rollback strategy if the new model causes a latency spike in the first hour of production traffic?", "difficulty": "medium"},
+            {"question": "What is training/serving skew? Describe three ways it can occur in a production ML system and how you prevent each.", "follow_up": "How does a feature store with point-in-time joins help prevent the most common form of training/serving skew?", "difficulty": "hard"},
+            {"question": "Describe how you would implement model drift detection in production. What statistical tests would you use for different feature types?", "follow_up": "How do you decide when drift is severe enough to trigger an automatic retraining job versus just alerting the team?", "difficulty": "hard"},
+            {"question": "What is model quantisation? Explain PTQ vs QAT and describe the workflow for quantising a transformer model without significant accuracy loss.", "follow_up": "Which layers are most sensitive to quantisation and how do you handle them differently?", "difficulty": "hard"},
+            {"question": "How would you design a CI/CD pipeline for ML that runs data validation, model tests, and performance benchmarks before deployment?", "follow_up": "How do you handle the inherent non-determinism of model training in a CI test suite?", "difficulty": "medium"},
+            {"question": "Explain shadow deployment, canary releases, and blue-green deployments for ML models. When do you use each?", "follow_up": "How do you safely do a canary release when your model results are used as input to a downstream model?", "difficulty": "hard"},
+            {"question": "How would you set up automated retraining for a production ML model? What triggers retraining and what validation gates exist?", "follow_up": "How do you prevent a retraining pipeline from automatically promoting a model trained on corrupted data?", "difficulty": "hard"},
+            {"question": "What is vLLM and how does PagedAttention work? How would you choose between vLLM and TGI for a production LLM serving system?", "follow_up": "How does continuous batching in vLLM improve GPU utilisation compared to static batching?", "difficulty": "hard"},
+            {"question": "How do you implement experiment tracking for ML with MLflow or Weights & Biases? What should every experiment log?", "follow_up": "How do you organise experiments across a team of 20 engineers so that results remain comparable and reproducible?", "difficulty": "easy"},
+            {"question": "Describe how Kubernetes HPA works for ML serving. What are the specific challenges of autoscaling GPU inference workloads?", "follow_up": "How does KEDA differ from standard HPA for scaling inference workloads based on message queue depth?", "difficulty": "hard"},
+            {"question": "What is model pruning and how would you prune a transformer model to reduce inference cost without significant accuracy loss?", "follow_up": "How does structured pruning differ from unstructured pruning and which is easier to implement for production serving?", "difficulty": "hard"},
+            {"question": "How do you containerise a large deep learning model for production and what optimisations improve cold start time?", "follow_up": "How does ONNX Runtime or TensorRT compare to PyTorch eager mode for inference latency and memory efficiency?", "difficulty": "medium"},
+            {"question": "What is the purpose of a model card and what information should it contain?", "follow_up": "How does publishing a model card change the accountability structure when a model causes harm in production?", "difficulty": "easy"},
+            {"question": "How would you implement online A/B testing for two model versions in production? What statistical considerations matter?", "follow_up": "How do you handle novelty effects in an A/B test where users behave differently simply because something changed?", "difficulty": "medium"},
+            {"question": "Describe how you would build a cost attribution system to track GPU spending per team or per model in a shared ML platform.", "follow_up": "How do you incentivise resource efficiency without creating bureaucratic overhead that slows down experimentation?", "difficulty": "medium"},
+            {"question": "What is data versioning and how do you tie a model version to the exact dataset version used to train it?", "follow_up": "Which tools (DVC, Delta Lake, LakeFS) help manage dataset versioning in a large ML organisation and what are their tradeoffs?", "difficulty": "easy"},
+            {"question": "How would you implement a logging and observability stack for a production LLM serving system? What metrics are unique to LLM workloads?", "follow_up": "How do you monitor token generation throughput and detect degradation caused by context length distribution shifts?", "difficulty": "medium"},
+        ],
+        "behavioral": [
+            {"question": "Tell me about the most complex ML system you've built or contributed to. What were the hardest engineering decisions?", "follow_up": "If you were rebuilding it today, what architectural choices would you change and why?", "difficulty": "medium"},
+            {"question": "Describe a time when a model you trained performed well offline but degraded in production. How did you debug and fix it?", "follow_up": "What monitoring or validation steps did you add to catch this class of problem in the future?", "difficulty": "hard"},
+            {"question": "Tell me about a time you disagreed with a data scientist about how to approach a model problem. How did you resolve it?", "follow_up": "How has that experience changed how you navigate technical disagreements with colleagues from different backgrounds?", "difficulty": "medium"},
+            {"question": "Describe a time when you had to make a significant infrastructure or tooling decision under time pressure. What was your approach?", "follow_up": "Looking back, was it the right decision and what would you do differently?", "difficulty": "medium"},
+            {"question": "Tell me about a time you identified and fixed a data quality issue that was silently corrupting a model's predictions.", "follow_up": "What data quality checks did you implement to prevent the same issue from recurring?", "difficulty": "hard"},
+            {"question": "Describe a time you mentored a junior ML engineer. What technical concepts did you focus on and how did you measure their growth?", "follow_up": "How do you balance giving guidance versus letting junior engineers work through problems independently?", "difficulty": "easy"},
+            {"question": "Tell me about a project where you had to significantly optimise training or inference speed. What bottleneck did you find and how did you fix it?", "follow_up": "How did you measure and validate the performance improvement without regressing model accuracy?", "difficulty": "hard"},
+            {"question": "Describe a situation where you had to push back on a product requirement because it was technically infeasible or would take too long. How did you handle it?", "follow_up": "How do you find a middle ground that delivers business value without overcommitting your team?", "difficulty": "medium"},
+            {"question": "Tell me about a time you had to quickly learn a new deep learning framework or MLOps tool to complete a project. How did you approach it?", "follow_up": "What is your process for evaluating whether a new tool is actually better than what you already use?", "difficulty": "easy"},
+            {"question": "Describe a situation where a model you built had unintended biased or unfair behaviour. What did you do about it?", "follow_up": "How do you systematically audit ML models for fairness before and after deployment?", "difficulty": "hard"},
+            {"question": "Tell me about a time when a training run or experiment you were counting on failed at a critical moment. How did you handle it?", "follow_up": "What infrastructure or process improvements did you put in place to reduce the risk of critical experiment failures?", "difficulty": "medium"},
+            {"question": "Describe how you prioritise technical debt in a fast-moving ML engineering team. Give a concrete example.", "follow_up": "How do you communicate the value of addressing technical debt to a product manager focused on feature delivery?", "difficulty": "medium"},
+            {"question": "Tell me about a time you had to collaborate with a research team to take an experimental idea into a production ML system. What challenges arose?", "follow_up": "How do you bridge the gap between research-quality code and production engineering standards?", "difficulty": "hard"},
+            {"question": "Describe a time you communicated a negative result — an experiment that didn't work — to stakeholders. How did you frame it?", "follow_up": "What did you propose as the next steps and how did the team respond?", "difficulty": "easy"},
+            {"question": "How do you stay current with ML research and engineering? Give a concrete example of a recent advancement that changed your practice.", "follow_up": "How do you decide whether a technique from a new paper is production-ready or still too experimental to use?", "difficulty": "easy"},
+            {"question": "Tell me about a time you had to make a model work within strict latency, memory, or cost constraints. How did you approach the optimisation?", "follow_up": "What tradeoffs between accuracy and efficiency did you make and how did you validate they were acceptable?", "difficulty": "hard"},
+            {"question": "Describe a project where collaboration with non-ML stakeholders (legal, compliance, product) was critical. What did you learn?", "follow_up": "How do you translate ML uncertainty and model limitations into language that non-technical stakeholders can act on?", "difficulty": "medium"},
+        ],
     },
-    "Product Manager": {
-        "roadmap strategy okr vision": "strategy",
-        "sprint agile jira release": "execution",
-        "user research customer interview": "applied",
-    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ROLE: Data Analyst
+    # ══════════════════════════════════════════════════════════════════════════
     "Data Analyst": {
-        "sql postgres bigquery redshift dbt": "sql_data",
-        "regression cohort funnel statistics": "statistics_analysis",
-        "dashboard tableau looker powerbi stakeholder": "communication",
+        "machine_learning": [
+            {"question": "As a data analyst, when would you recommend using a machine learning model versus a simpler statistical or rule-based approach?", "follow_up": "How do you communicate the uncertainty and limitations of an ML model to a business stakeholder who wants a definitive answer?", "difficulty": "easy"},
+            {"question": "Explain logistic regression in terms a data analyst would use. How is it different from linear regression and when would you use each?", "follow_up": "How do you interpret the coefficients of a logistic regression model and what are the pitfalls of over-interpreting them?", "difficulty": "easy"},
+            {"question": "What is clustering and how would a data analyst use k-means to segment customers? Walk me through the process.", "follow_up": "How do you choose the number of clusters and validate that the segmentation is meaningful to the business?", "difficulty": "easy"},
+            {"question": "Explain the concept of a decision tree. How would you explain it to a business user who wants to understand why customers churn?", "follow_up": "What are the limitations of a single decision tree versus a random forest for this use case?", "difficulty": "easy"},
+            {"question": "What is overfitting and why does it matter for a predictive model a data analyst might build?", "follow_up": "How do cross-validation and a hold-out test set help you detect overfitting before deploying a model?", "difficulty": "easy"},
+            {"question": "How would you evaluate the accuracy of a binary classifier like a churn prediction model? What metrics would you report to the business?", "follow_up": "How do you choose the right classification threshold and who should be involved in that decision?", "difficulty": "medium"},
+            {"question": "What is feature importance and how can a data analyst use it to understand which factors drive a business outcome?", "follow_up": "How would you use SHAP values to explain an individual customer's churn prediction to a sales representative?", "difficulty": "medium"},
+            {"question": "How would you build a simple propensity to purchase model for an e-commerce platform? What features would you include?", "follow_up": "How do you validate that the model's predictions are well-calibrated and not systematically biased?", "difficulty": "medium"},
+            {"question": "What is the difference between supervised and unsupervised learning? Give a concrete business example of each.", "follow_up": "How does semi-supervised learning combine both approaches and when is it useful for a data analyst?", "difficulty": "easy"},
+            {"question": "Explain the concept of cross-validation and why it matters when building a predictive model.", "follow_up": "What is the difference between k-fold cross-validation and a simple train/test split, and when does k-fold matter more?", "difficulty": "medium"},
+            {"question": "How would you handle missing data before building a machine learning model? What are the tradeoffs between imputation strategies?", "follow_up": "When does imputing missing data introduce bias into a model and how do you detect this?", "difficulty": "medium"},
+            {"question": "What is a confusion matrix and how do you use it to explain a model's errors to a business stakeholder?", "follow_up": "How do you translate precision and recall into business terms for a model that predicts at-risk customers?", "difficulty": "medium"},
+            {"question": "How would you design a simple A/B test to validate whether a new ML-driven recommendation feature improves conversion rate?", "follow_up": "What is the minimum sample size required and how do you calculate statistical power for the test?", "difficulty": "medium"},
+            {"question": "What is time-series forecasting and how would you use it to predict monthly sales revenue for a business unit?", "follow_up": "How do you handle seasonality and trend in a time-series model and how do you validate forecast accuracy?", "difficulty": "medium"},
+            {"question": "How would you approach a sentiment analysis task on customer reviews using a pre-trained NLP model?", "follow_up": "How do you validate that the model works well for your specific domain if it was pre-trained on generic text?", "difficulty": "hard"},
+            {"question": "What is anomaly detection and how would you use it to identify unusual spikes in website traffic?", "follow_up": "How do you set the sensitivity threshold to minimise false alarms while still catching real anomalies?", "difficulty": "hard"},
+            {"question": "How would you explain p-values and statistical significance to a product manager who wants to know if an experiment was successful?", "follow_up": "What is practical significance versus statistical significance and why does the difference matter for business decisions?", "difficulty": "easy"},
+        ],
+        "deep_learning": [
+            {"question": "As a data analyst, when would you consider using a deep learning model versus a traditional ML model? What factors drive that decision?", "follow_up": "What questions would you ask a data scientist who recommends deep learning for an analytics problem?", "difficulty": "easy"},
+            {"question": "What is a neural network at a conceptual level? How would you explain it to a business stakeholder?", "follow_up": "What types of patterns can a neural network detect that a linear model cannot?", "difficulty": "easy"},
+            {"question": "What are image recognition models and how might a data analyst use one to automate a manual visual inspection process?", "follow_up": "What data labelling effort is required to train a custom image classifier and how do you estimate the cost?", "difficulty": "easy"},
+            {"question": "How do pre-trained language models like BERT work and how can a data analyst use them to extract insights from text data?", "follow_up": "How would you use a pre-trained model to classify customer support tickets into categories without labelling thousands of examples?", "difficulty": "medium"},
+            {"question": "What is natural language processing (NLP) and how can a data analyst use NLP techniques to extract insights from customer feedback?", "follow_up": "What is the difference between topic modelling (LDA) and sentiment analysis, and when would you use each?", "difficulty": "easy"},
+            {"question": "What is an embedding and why is it useful for analysing text data? How would you visualise embeddings to explore a text corpus?", "follow_up": "How would you use cosine similarity between embeddings to find customer reviews that are semantically similar?", "difficulty": "medium"},
+            {"question": "How would you use a pre-trained deep learning model to build a product image search feature? What are the steps involved?", "follow_up": "How do you evaluate whether the image search results are relevant to a query without labelling thousands of pairs?", "difficulty": "medium"},
+            {"question": "What is transfer learning and why does it make deep learning accessible to data analysts with limited labelled data?", "follow_up": "How would you explain the cost-benefit of using a pre-trained model versus training from scratch to a business stakeholder?", "difficulty": "easy"},
+            {"question": "How would a data analyst use a speech-to-text deep learning model to analyse customer call centre conversations?", "follow_up": "What accuracy limitations should you communicate to stakeholders and how do you measure transcription accuracy?", "difficulty": "medium"},
+            {"question": "What are autoencoders and how could a data analyst use one for anomaly detection in transaction data?", "follow_up": "How do you interpret the reconstruction error as an anomaly score and choose the threshold for flagging transactions?", "difficulty": "hard"},
+            {"question": "What is a recurrent neural network and in what scenarios would a data analyst use one for time-series analysis?", "follow_up": "How does LSTM compare to a simpler ARIMA model for demand forecasting and when does the added complexity pay off?", "difficulty": "hard"},
+            {"question": "How do you evaluate the performance of a deep learning model on a business problem? What metrics would you present to a stakeholder?", "follow_up": "How do you translate model accuracy metrics into business impact metrics like revenue or cost savings?", "difficulty": "medium"},
+            {"question": "What is model interpretability and why does it matter for a data analyst presenting findings to business leadership?", "follow_up": "How do you balance using the most accurate model versus the most interpretable model for a business recommendation?", "difficulty": "medium"},
+            {"question": "How would you use a clustering deep learning model to segment customers based on their purchase behaviour patterns?", "follow_up": "How do you validate that the clusters are meaningful and actionable for a marketing team?", "difficulty": "hard"},
+            {"question": "What is a generative model and how might a data analyst use synthetic data generation to address a data scarcity problem?", "follow_up": "What are the risks of using synthetic data in a business analysis and how do you disclose this to stakeholders?", "difficulty": "hard"},
+            {"question": "How does the concept of overfitting apply to deep learning models and what should a data analyst watch for?", "follow_up": "How do learning curves help you diagnose whether a deep learning model is overfitting or underfitting?", "difficulty": "medium"},
+            {"question": "What is the difference between classification and regression in deep learning? Give a business example of each.", "follow_up": "How would you reframe a regression problem (predicting revenue) as a classification problem if your stakeholder finds it easier to interpret?", "difficulty": "easy"},
+        ],
+        "llm_generative_ai": [
+            {"question": "How would a data analyst use a large language model like GPT to accelerate their daily analysis workflow? Give three concrete examples.", "follow_up": "What verification steps do you always take before using LLM-generated analysis in a business report?", "difficulty": "easy"},
+            {"question": "What is prompt engineering and why does it matter for a data analyst using LLM tools?", "follow_up": "How do you write a prompt to extract structured data (like a table) from an unstructured paragraph of text?", "difficulty": "easy"},
+            {"question": "How would you use an LLM to help you write and debug SQL queries more efficiently? What are the limitations?", "follow_up": "How do you verify that an LLM-generated SQL query is correct and returns the results you intended?", "difficulty": "easy"},
+            {"question": "What is RAG (Retrieval-Augmented Generation) and how could a data analyst use it to build a Q&A tool over a large internal document repository?", "follow_up": "How do you evaluate whether the RAG system's answers are accurate and based on the correct source documents?", "difficulty": "medium"},
+            {"question": "How would you use an LLM to perform text classification on customer support tickets without labelling training data?", "follow_up": "How do you validate the classification accuracy and when do you need to fall back to a labelled training approach?", "difficulty": "medium"},
+            {"question": "How would a data analyst use an LLM to automate the writing of routine business reports or executive summaries?", "follow_up": "What quality checks and review processes should be in place before an LLM-generated report reaches leadership?", "difficulty": "easy"},
+            {"question": "What are the risks of using LLMs for data analysis, particularly around hallucination and data privacy?", "follow_up": "What data governance rules should a data analyst follow when using LLM tools with sensitive business data?", "difficulty": "medium"},
+            {"question": "How would you use an LLM to help with exploratory data analysis — for example, generating initial hypotheses or summarising dataset characteristics?", "follow_up": "What follow-up statistical or visual analysis would you always perform to validate LLM-generated hypotheses?", "difficulty": "easy"},
+            {"question": "How do you use few-shot prompting to extract structured entities from unstructured text? Walk me through an example.", "follow_up": "How do you evaluate extraction accuracy across a sample of documents and what error rate is acceptable?", "difficulty": "medium"},
+            {"question": "What is sentiment analysis using an LLM and how would you use it to monitor customer feedback at scale?", "follow_up": "How do you handle sarcasm, mixed sentiment, and domain-specific language when applying an LLM for sentiment analysis?", "difficulty": "medium"},
+            {"question": "How would you use an LLM to automatically generate and test visualisation ideas from a new dataset?", "follow_up": "What criteria do you use to evaluate whether a visualisation generated by an LLM is appropriate and accurate?", "difficulty": "hard"},
+            {"question": "How would a data analyst use an LLM agent to automate a multi-step data analysis workflow?", "follow_up": "What human oversight checkpoints do you build into an automated analysis agent to catch errors before they propagate?", "difficulty": "hard"},
+            {"question": "What is the difference between using a closed-source LLM API (like OpenAI) and an open-source model for business analytics?", "follow_up": "What data residency and confidentiality considerations should a data analyst factor in when choosing between options?", "difficulty": "medium"},
+            {"question": "How would you use an LLM to perform a thematic analysis of 10,000 open-ended survey responses?", "follow_up": "How do you validate the themes identified by the LLM with a smaller human-reviewed sample?", "difficulty": "hard"},
+            {"question": "What is chain-of-thought prompting and how does it help an LLM perform more reliable analytical reasoning?", "follow_up": "In what types of analytical tasks does chain-of-thought prompting make the biggest difference and why?", "difficulty": "medium"},
+            {"question": "How do you use an LLM to enrich a dataset by extracting features from text columns? Give a concrete example.", "follow_up": "How do you ensure consistency and reproducibility when using LLM-based feature extraction on a large dataset?", "difficulty": "hard"},
+            {"question": "What is a vector database and how would a data analyst use semantic search to find relevant records in a large text corpus?", "follow_up": "How does semantic search differ from keyword search and in what scenarios does each perform better?", "difficulty": "medium"},
+        ],
+        "python_coding": [
+            {"question": "How would you use pandas to clean a dataset with missing values, duplicate rows, and inconsistent date formats?", "follow_up": "What is the difference between `fillna`, `dropna`, and interpolation for handling missing values, and when is each appropriate?", "difficulty": "easy"},
+            {"question": "Write a Python function that reads a CSV file, filters rows based on a condition, and writes the result to a new CSV.", "follow_up": "How does pandas handle large CSV files that don't fit in memory, and what alternatives do you have?", "difficulty": "easy"},
+            {"question": "How would you use Python to connect to a SQL database, run a query, and load the results into a pandas DataFrame?", "follow_up": "What are the security risks of building SQL queries with string formatting and how do you prevent SQL injection?", "difficulty": "easy"},
+            {"question": "Explain the difference between `groupby`, `pivot_table`, and `crosstab` in pandas. When would you use each?", "follow_up": "How do you efficiently apply a custom aggregation function to a grouped pandas DataFrame?", "difficulty": "medium"},
+            {"question": "How would you use Python and matplotlib or seaborn to create a dashboard-style visualisation from a sales dataset?", "follow_up": "How do you choose between matplotlib, seaborn, and plotly for different types of analytical visualisations?", "difficulty": "easy"},
+            {"question": "Write a Python script that fetches data from a REST API with pagination and stores the results in a pandas DataFrame.", "follow_up": "How do you handle API rate limits and authentication tokens in a Python script that runs on a schedule?", "difficulty": "medium"},
+            {"question": "How would you implement a simple ETL (Extract, Transform, Load) pipeline in Python to move data from a CSV to a database?", "follow_up": "How do you handle schema changes in the source data without breaking the ETL pipeline?", "difficulty": "medium"},
+            {"question": "Explain list comprehensions and lambda functions in Python. Give an example where they simplify data transformation code.", "follow_up": "When does a lambda function make code harder to read and when should you use a named function instead?", "difficulty": "easy"},
+            {"question": "How would you use Python's `re` module to extract structured information from unstructured text, like email addresses or dates?", "follow_up": "What are the limitations of regex for text extraction and when would you use an NLP library instead?", "difficulty": "medium"},
+            {"question": "How do you merge two DataFrames in pandas? Explain the difference between inner, left, right, and outer joins.", "follow_up": "How do you diagnose and handle duplicate rows that appear after a merge?", "difficulty": "easy"},
+            {"question": "How would you automate a weekly data report in Python — including data pull, transformation, and email delivery?", "follow_up": "How do you handle failures in an automated report script and alert the analyst when the report doesn't generate?", "difficulty": "medium"},
+            {"question": "How do you use Python to perform time-series analysis on a dataset of monthly sales figures, including trend decomposition?", "follow_up": "How do you use statsmodels or Prophet to forecast future values and quantify prediction uncertainty?", "difficulty": "hard"},
+            {"question": "How would you use Python to detect and visualise outliers in a dataset before presenting it to a business stakeholder?", "follow_up": "How do you decide whether an outlier is a data error that should be removed or a genuine extreme value that should be kept?", "difficulty": "medium"},
+            {"question": "How would you use Python to implement a cohort analysis of user retention from a table of event timestamps?", "follow_up": "How do you visualise cohort retention as a heatmap and what patterns would you look for to diagnose a product problem?", "difficulty": "hard"},
+            {"question": "What is the difference between `.apply()`, `.map()`, and `.applymap()` in pandas? When is vectorisation preferred?", "follow_up": "How does using numpy vectorised operations instead of `.apply()` improve performance on a large DataFrame?", "difficulty": "medium"},
+            {"question": "How would you write a Python function that validates the schema and data types of a DataFrame before using it in an analysis?", "follow_up": "How do you use Pandera or Great Expectations to turn these checks into reusable, documented data contracts?", "difficulty": "hard"},
+            {"question": "How would you use Python to build an interactive chart from a dataset that allows stakeholders to filter by date and region?", "follow_up": "How does Streamlit or Dash enable a data analyst to build and share interactive dashboards without full-stack web development skills?", "difficulty": "hard"},
+        ],
+        "system_design": [
+            {"question": "How would you design a simple reporting pipeline that produces daily business metrics from raw event logs in a data warehouse?", "follow_up": "How do you ensure the reports are accurate and alert the team when the underlying data is missing or delayed?", "difficulty": "easy"},
+            {"question": "Describe the architecture of a business intelligence (BI) stack that enables 200 analysts to self-serve queries on a 5 TB dataset.", "follow_up": "How do you govern access so that analysts can only query data they are authorised to see?", "difficulty": "medium"},
+            {"question": "How would you design a data pipeline that ingests sales data from 10 regional systems with different formats into a central analytics database?", "follow_up": "How do you handle schema mismatches and missing fields when the source systems evolve independently?", "difficulty": "medium"},
+            {"question": "What is a data warehouse versus a data lake? How would you recommend a company choose between them for analytics?", "follow_up": "What is a lakehouse architecture and how does it combine the benefits of both approaches?", "difficulty": "medium"},
+            {"question": "How would you design a real-time dashboard that shows live sales metrics updated every minute?", "follow_up": "What tradeoffs do you make between data freshness and query performance for a real-time analytics dashboard?", "difficulty": "medium"},
+            {"question": "Describe the key components of a data quality framework for an organisation's analytics platform.", "follow_up": "How do you prioritise which data quality checks to implement first when the data estate has hundreds of tables?", "difficulty": "medium"},
+            {"question": "How would you design a customer segmentation system that automatically updates segment membership weekly based on new behaviour data?", "follow_up": "How do you handle a customer who moves between segments and ensure marketing actions are consistent?", "difficulty": "hard"},
+            {"question": "What is a data mart and how does it differ from a data warehouse? When would you build one?", "follow_up": "What governance challenges arise when multiple business units each maintain their own data mart independently?", "difficulty": "easy"},
+            {"question": "How would you design a system to track the end-to-end lineage of a KPI metric, from the source data through all transformations to the dashboard?", "follow_up": "How does data lineage help you diagnose the root cause when a metric value suddenly changes unexpectedly?", "difficulty": "hard"},
+            {"question": "How would you architect a data pipeline that powers a weekly churn report for a SaaS product?", "follow_up": "How do you version the churn metric definition so that changes to the formula are tracked and comparable over time?", "difficulty": "medium"},
+            {"question": "How would you design an A/B testing data infrastructure that stores experiment assignments, events, and analysis results for 50 concurrent experiments?", "follow_up": "How do you prevent users in one experiment from being erroneously assigned to a control or treatment group of another?", "difficulty": "hard"},
+            {"question": "What is a slowly changing dimension (SCD) in data warehousing and how do you handle it in an analytics pipeline?", "follow_up": "What is the difference between SCD Type 1, Type 2, and Type 3, and when is each approach appropriate?", "difficulty": "hard"},
+            {"question": "How would you design a pipeline to ingest and analyse customer call recordings for sentiment and topic extraction at scale?", "follow_up": "What data storage and processing components are needed to make the analysis results queryable by analysts within minutes?", "difficulty": "hard"},
+            {"question": "Describe how you would implement a metric store for a product organisation. What metadata should each metric have?", "follow_up": "How does a metric store prevent the problem of different teams computing the same metric differently?", "difficulty": "medium"},
+            {"question": "What are the key considerations when designing a reporting database that is used for both ad-hoc SQL queries by analysts and scheduled dashboard queries?", "follow_up": "How do you prevent long-running analyst queries from degrading the performance of scheduled dashboard refreshes?", "difficulty": "medium"},
+            {"question": "How would you design a simple pipeline that takes raw CSV files uploaded by business teams and makes them queryable in a central BI tool?", "follow_up": "How do you enforce data quality standards and reject files that don't meet the expected schema?", "difficulty": "easy"},
+            {"question": "What is data observability and how does it differ from traditional data quality monitoring?", "follow_up": "Which data observability tools (Monte Carlo, Bigeye, Soda) would you recommend and why?", "difficulty": "easy"},
+        ],
+        "mlops": [
+            {"question": "What does model deployment mean and why should a data analyst care about it even if they are not responsible for it?", "follow_up": "How does understanding deployment help a data analyst better communicate model requirements to an engineering team?", "difficulty": "easy"},
+            {"question": "What is model drift and how would a data analyst detect it by looking at prediction outputs over time?", "follow_up": "What visualisations or dashboards would you build to help a business team understand when a model is no longer reliable?", "difficulty": "medium"},
+            {"question": "How would you use MLflow or a similar experiment tracking tool as a data analyst building predictive models in notebooks?", "follow_up": "What minimum information should you log for every model experiment to make results reproducible?", "difficulty": "easy"},
+            {"question": "What is the difference between a model in development and a model in production from a data analyst's perspective?", "follow_up": "What information should a data analyst document when handing over a model to an engineering team for deployment?", "difficulty": "easy"},
+            {"question": "How would you monitor the performance of a churn prediction model in production using only outputs and business metrics?", "follow_up": "How long do you wait before concluding that a deployed model is underperforming, given that churn takes weeks to observe?", "difficulty": "medium"},
+            {"question": "What is training/serving skew and how can a data analyst accidentally introduce it during feature engineering?", "follow_up": "How do you design your feature engineering code to be reusable for both training and production scoring without drift?", "difficulty": "medium"},
+            {"question": "What is batch scoring and how would a data analyst use it to generate weekly propensity scores for a marketing campaign?", "follow_up": "How do you validate that the batch scoring run completed correctly and the scores are plausible before handing them to marketing?", "difficulty": "easy"},
+            {"question": "How would you version a machine learning model built in a notebook so that results are reproducible six months later?", "follow_up": "What environment management tools (conda, Docker, Poetry) are appropriate for a data analyst versus a production ML engineer?", "difficulty": "medium"},
+            {"question": "What is A/B testing for a machine learning model and how does it differ from a standard product A/B test?", "follow_up": "How do you detect if users are being assigned inconsistently between experiment arms in a live model test?", "difficulty": "medium"},
+            {"question": "How do you collaborate with a data engineering team to ensure the data pipeline feeding your model stays healthy in production?", "follow_up": "What SLA agreements and alerting mechanisms do you put in place between analytics and engineering?", "difficulty": "medium"},
+            {"question": "What is model documentation and what should a data analyst include when sharing a model with the business?", "follow_up": "How does a model card differ from a technical notebook and what audience is each written for?", "difficulty": "easy"},
+            {"question": "How would you set up automated retraining for a simple churn model that needs fresh data monthly?", "follow_up": "What validation checks ensure the retrained model is better before replacing the previous version in production?", "difficulty": "hard"},
+            {"question": "What is shadow mode testing for a model and how would you design a data analysis to compare shadow predictions to a live model?", "follow_up": "How do you quantify disagreement between the two models and decide which is performing better?", "difficulty": "hard"},
+            {"question": "How do you ensure a predictive model built by a data analyst is fair and does not discriminate against protected groups?", "follow_up": "What fairness metrics would you compute and how do you present them in a way that informs a business decision about deployment?", "difficulty": "hard"},
+            {"question": "What is data versioning and why does it matter for reproducibility in a data analysis project?", "follow_up": "How do you ensure that the training dataset used six months ago can be exactly reconstructed for audit purposes?", "difficulty": "medium"},
+            {"question": "How would you create a monitoring dashboard for a deployed model that a business stakeholder (not an engineer) can use?", "follow_up": "What alert conditions would you configure on the dashboard and who should be notified when a threshold is breached?", "difficulty": "medium"},
+            {"question": "What is an experiment tracking system and how does it help a data analyst compare model versions systematically?", "follow_up": "What happens when you forget to track an experiment and need to reproduce results three months later?", "difficulty": "easy"},
+        ],
+        "behavioral": [
+            {"question": "Tell me about a time you discovered an insight in data that significantly changed a business decision. How did you communicate it?", "follow_up": "How did you ensure the decision-makers followed through on the recommendation and how did you measure impact?", "difficulty": "medium"},
+            {"question": "Describe a time when a stakeholder disagreed with your analysis or questioned your methodology. How did you handle it?", "follow_up": "What changes did you make to how you present analyses to make them more defensible in the future?", "difficulty": "medium"},
+            {"question": "Tell me about a time you had to work with very messy or incomplete data. What approach did you take?", "follow_up": "How did you communicate the data quality limitations to stakeholders so they could make appropriately cautious decisions?", "difficulty": "medium"},
+            {"question": "Describe a situation where you had to explain a complex statistical concept to a non-technical business audience. How did you approach it?", "follow_up": "What visualisation or analogy did you use and how did you know the audience understood it?", "difficulty": "easy"},
+            {"question": "Tell me about a time you proactively identified a data quality problem before it caused a business error. What did you do?", "follow_up": "What monitoring or validation checks did you put in place to catch similar issues automatically in the future?", "difficulty": "medium"},
+            {"question": "Describe a project where you had to work with data from multiple systems with inconsistent definitions. How did you manage it?", "follow_up": "How do you build a single source of truth for a business metric when it is calculated differently across teams?", "difficulty": "medium"},
+            {"question": "Tell me about a time you had to deliver a data-driven recommendation that conflicted with a senior leader's intuition. What happened?", "follow_up": "How do you balance standing by your analysis with remaining open to information you might have missed?", "difficulty": "hard"},
+            {"question": "Describe a time you had to meet a tight deadline for a data analysis project. How did you prioritise and manage your time?", "follow_up": "How do you communicate scope changes to stakeholders when you realise you cannot meet the original requirements on time?", "difficulty": "easy"},
+            {"question": "Tell me about a time you designed or improved a dashboard that significantly changed how a team used data. What made it successful?", "follow_up": "How do you ensure stakeholders actually use and trust a dashboard rather than reverting to manual spreadsheet analysis?", "difficulty": "easy"},
+            {"question": "Describe a situation where you identified an ethical issue or potential bias in data or an analysis. What did you do?", "follow_up": "How do you build ethical analysis practices into your standard workflow rather than treating them as an afterthought?", "difficulty": "hard"},
+            {"question": "Tell me about a time you collaborated with a data engineering team. What challenges arose and how did you resolve them?", "follow_up": "How do you manage dependencies on upstream data pipelines so that delays don't block your analysis work?", "difficulty": "easy"},
+            {"question": "Describe a time you had to learn a new tool or analytical technique quickly to complete a project. How did you get up to speed?", "follow_up": "What is your process for evaluating whether a new tool is worth the learning investment for your team?", "difficulty": "easy"},
+            {"question": "Tell me about the most technically challenging analysis project you have worked on. What made it difficult and how did you succeed?", "follow_up": "What would you do differently if you started that project today?", "difficulty": "hard"},
+            {"question": "Describe a time you mentored a junior analyst. What did you focus on and how did you measure your impact?", "follow_up": "How do you adapt your approach for an analyst who is technically capable but struggles to present findings clearly?", "difficulty": "easy"},
+            {"question": "Tell me about a time you had to balance competing priorities from multiple stakeholders all wanting your analysis first. How did you manage it?", "follow_up": "How do you build a transparent prioritisation process so stakeholders understand why their request is queued?", "difficulty": "medium"},
+            {"question": "Describe a time when a predictive model or analysis you produced turned out to be wrong. How did you handle it?", "follow_up": "What process did you put in place to catch errors earlier in future projects?", "difficulty": "hard"},
+            {"question": "How do you stay current with developments in data analytics and tools? Give a recent example that changed your practice.", "follow_up": "How do you evaluate whether a new analytics tool is mature enough to adopt for production reporting?", "difficulty": "easy"},
+        ],
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ROLE: Product Manager
+    # ══════════════════════════════════════════════════════════════════════════
+    "Product Manager": {
+        "machine_learning": [
+            {"question": "As a product manager, how do you decide when to use machine learning versus a simpler rule-based approach in a product feature?", "follow_up": "How do you communicate that decision to stakeholders who may have different views on complexity and cost?", "difficulty": "easy"},
+            {"question": "How do you define success metrics for a machine learning-powered feature in a product? What metrics matter beyond model accuracy?", "follow_up": "How do you align ML model metrics with business KPIs so that optimising the model leads to real business improvement?", "difficulty": "medium"},
+            {"question": "What is the concept of precision and recall, and how would you explain to an engineering team which one to optimise for in a content moderation system?", "follow_up": "Who are the stakeholders who should be involved in deciding the precision-recall tradeoff for a moderation model?", "difficulty": "medium"},
+            {"question": "How do you evaluate whether a machine learning model in your product is performing well enough to keep or needs to be retrained?", "follow_up": "What data and tooling do you need from the engineering team to make this evaluation as a PM?", "difficulty": "medium"},
+            {"question": "A data scientist tells you that the model has 92% accuracy. How do you interpret this and what follow-up questions do you ask?", "follow_up": "How do you decide whether 92% accuracy is good enough to ship based on the specific product context?", "difficulty": "easy"},
+            {"question": "What is model bias and how does it manifest as a product risk? Give a concrete example.", "follow_up": "What process do you put in place to identify and mitigate bias before shipping an ML feature to users?", "difficulty": "medium"},
+            {"question": "How do you prioritise an ML feature in your product roadmap? What information do you gather from data scientists and engineers?", "follow_up": "How do you handle disagreements between engineering's estimate of what is feasible and leadership's expectations?", "difficulty": "medium"},
+            {"question": "What is the cold start problem in recommendation systems and how does it affect user experience for new users or new items?", "follow_up": "What product strategies (onboarding flows, explicit feedback prompts) help you gather signals to overcome cold start?", "difficulty": "easy"},
+            {"question": "How would you design an A/B test to evaluate whether a new ML-powered recommendation feature improves user engagement?", "follow_up": "How do you prevent a novelty effect from inflating the experiment results for the new feature?", "difficulty": "medium"},
+            {"question": "What is model drift and what are the product consequences if it goes undetected for months?", "follow_up": "How would you set up monitoring as a PM so that you are alerted to model degradation before users complain?", "difficulty": "medium"},
+            {"question": "How do you define the requirements for an ML feature in a product spec? What must you include that you wouldn't need for a traditional software feature?", "follow_up": "How do you handle the inherent uncertainty in ML performance estimates when writing a product spec?", "difficulty": "hard"},
+            {"question": "What is the difference between a classification and a regression model and what types of product features use each?", "follow_up": "How does the choice between classification and regression affect how you present the model's output to end users?", "difficulty": "easy"},
+            {"question": "How would you approach building an ML-powered personalisation feature for a product with 10 million users?", "follow_up": "How do you segment your user base to prioritise who benefits first from personalisation and why?", "difficulty": "hard"},
+            {"question": "What is feature engineering and why does it matter for a PM working with an ML team?", "follow_up": "How do you ensure the features used to train a model are ethically acceptable and compliant with user data policies?", "difficulty": "medium"},
+            {"question": "What is a confusion matrix and how would you use it to make a product decision about a fraud detection feature?", "follow_up": "How do you communicate the tradeoffs between false positives (blocking legitimate users) and false negatives (allowing fraud) to business leaders?", "difficulty": "hard"},
+            {"question": "How do you handle user feedback about a machine learning feature that is producing incorrect or unexpected results?", "follow_up": "How do you triage user-reported ML errors and translate them into actionable requirements for the model team?", "difficulty": "medium"},
+            {"question": "What is explainability in machine learning and why does it matter for a product manager building user-facing AI features?", "follow_up": "How do you design a product UX that builds user trust in an AI decision without overexplaining technical details?", "difficulty": "hard"},
+        ],
+        "deep_learning": [
+            {"question": "As a product manager, how do you explain what a large language model is to a non-technical executive?", "follow_up": "What are the key capabilities and limitations of LLMs that every PM working with them must understand?", "difficulty": "easy"},
+            {"question": "What are the key risks of shipping a deep learning feature in your product and how do you mitigate them in your launch plan?", "follow_up": "What approval or review process do you put in place before releasing an AI feature to all users?", "difficulty": "medium"},
+            {"question": "What is the difference between a pre-trained model and a fine-tuned model, and how does that distinction affect your product roadmap?", "follow_up": "How do you decide whether to use a pre-trained model off the shelf or invest in fine-tuning for your specific use case?", "difficulty": "medium"},
+            {"question": "How do you set user expectations appropriately for a product feature powered by deep learning? What do you communicate in the UX?", "follow_up": "How do you handle the case where users trust the AI output too much and don't apply critical thinking?", "difficulty": "medium"},
+            {"question": "What is image recognition and how could a product manager incorporate it into a consumer app feature?", "follow_up": "What data labelling and model training timeline would you need to plan for to ship this feature in six months?", "difficulty": "easy"},
+            {"question": "How does natural language understanding (NLU) power features like search, chatbots, and autocomplete in a product?", "follow_up": "What user research would you conduct to validate that an NLU-powered search feature is better than keyword search?", "difficulty": "easy"},
+            {"question": "What is model latency and why should a product manager care about inference speed when planning an AI feature?", "follow_up": "How do you negotiate latency requirements between product UX expectations and engineering constraints?", "difficulty": "medium"},
+            {"question": "How would you incorporate user feedback signals (thumbs up/down, corrections) into improving a deep learning model over time?", "follow_up": "What privacy and consent considerations affect how you collect and use user feedback for model improvement?", "difficulty": "hard"},
+            {"question": "What is a content recommendation system and how would you prioritise its features in a product roadmap?", "follow_up": "How do you measure whether a recommendation feature is improving user retention versus just increasing clickthrough rate?", "difficulty": "medium"},
+            {"question": "How do you plan for the infrastructure cost of a deep learning feature in a product business case?", "follow_up": "How do you present the cost-per-prediction tradeoff to finance leadership when justifying the AI investment?", "difficulty": "hard"},
+            {"question": "What is hallucination in AI systems and how do you design a product to minimise its impact on users?", "follow_up": "What UI design patterns help users identify and report incorrect AI outputs without destroying trust in the feature?", "difficulty": "hard"},
+            {"question": "How do you manage the relationship between product release cycles and the non-deterministic nature of ML model improvements?", "follow_up": "How do you set sprint goals and acceptance criteria for ML features when you can't predict exact performance improvements?", "difficulty": "hard"},
+            {"question": "What is transfer learning and how does it shorten the time-to-ship for a new AI feature in your product?", "follow_up": "What data requirements should a PM include in the product spec when the team plans to fine-tune a pre-trained model?", "difficulty": "medium"},
+            {"question": "How would you design the onboarding experience for an AI-powered feature to maximise user adoption?", "follow_up": "How do you measure onboarding success for an AI feature versus a traditional software feature?", "difficulty": "easy"},
+            {"question": "What are embeddings at a conceptual level and how do they power features like semantic search or content similarity in a product?", "follow_up": "How would you explain to a marketing team why semantic search finds results that keyword search would miss?", "difficulty": "easy"},
+            {"question": "How do you handle a situation where a deep learning model your team deployed starts producing results that damage user trust?", "follow_up": "What immediate rollback and communication plan do you execute and how do you prevent a recurrence?", "difficulty": "hard"},
+            {"question": "What is model monitoring and what should a PM track in a production AI feature health dashboard?", "follow_up": "How do you define the SLA for an AI feature and what escalation path exists when the SLA is breached?", "difficulty": "medium"},
+        ],
+        "llm_generative_ai": [
+            {"question": "How would you evaluate whether to build an LLM-powered feature in-house, use a third-party API, or use an open-source model?", "follow_up": "What cost, latency, privacy, and risk factors would you include in the business case?", "difficulty": "medium"},
+            {"question": "What is prompt engineering and why does a product manager need to understand it even if they are not writing prompts themselves?", "follow_up": "How does a change to the system prompt in production count as a product change and should it go through your normal release process?", "difficulty": "medium"},
+            {"question": "How do you design a product experience that manages user expectations around an LLM feature that sometimes makes mistakes?", "follow_up": "What disclosure language and UX patterns build trust with users while being honest about LLM limitations?", "difficulty": "medium"},
+            {"question": "What is RAG (Retrieval-Augmented Generation) and how would you use it to build an LLM-powered help centre for your product?", "follow_up": "How do you measure whether the RAG-powered help centre is actually reducing support ticket volume?", "difficulty": "medium"},
+            {"question": "How do you approach content safety and responsible AI for an LLM feature that generates text visible to end users?", "follow_up": "What review process and guardrails do you implement before the LLM feature is released to all users?", "difficulty": "medium"},
+            {"question": "What are the key product metrics for an LLM-powered feature like a writing assistant or chatbot?", "follow_up": "How do you distinguish between a user editing the LLM output because it was bad versus editing because they want their personal voice?", "difficulty": "hard"},
+            {"question": "How would you design a user feedback loop for an LLM feature that helps the model improve over time?", "follow_up": "What privacy and data usage consent issues arise when using user-generated content to fine-tune an LLM?", "difficulty": "hard"},
+            {"question": "What is an AI agent and how would you think about product use cases where an agent takes autonomous actions on behalf of a user?", "follow_up": "What trust, transparency, and control mechanisms must be built into a product that uses an AI agent?", "difficulty": "hard"},
+            {"question": "How do you manage the cost of LLM API usage in a product that scales to millions of users?", "follow_up": "What product design choices (caching, prompt compression, model tiering) reduce LLM API costs without degrading user experience?", "difficulty": "hard"},
+            {"question": "How would you write a product requirements document (PRD) for an LLM-powered feature? What is different compared to a traditional software PRD?", "follow_up": "How do you define acceptance criteria for an LLM feature when output quality is subjective?", "difficulty": "medium"},
+            {"question": "What are the regulatory and legal risks of shipping an LLM-powered feature and how do you manage them in your launch plan?", "follow_up": "How does the EU AI Act affect your product roadmap for high-risk AI applications?", "difficulty": "hard"},
+            {"question": "How would you prioritise a roadmap of LLM feature improvements when you have limited data science capacity?", "follow_up": "How do you balance quick wins (better prompts) against deeper improvements (fine-tuning) in a resource-constrained team?", "difficulty": "medium"},
+            {"question": "What is fine-tuning an LLM and when would you recommend it as a product investment versus prompt engineering?", "follow_up": "What data requirements and labelling costs should you plan for when recommending fine-tuning to engineering leadership?", "difficulty": "medium"},
+            {"question": "How do you handle a situation where an LLM feature in your product generates content that is factually wrong and a user acts on it?", "follow_up": "What crisis communication and product correction process do you execute after a high-profile AI error?", "difficulty": "hard"},
+            {"question": "How would you design an LLM-powered feature that respects user privacy and does not expose sensitive data to the model provider?", "follow_up": "What data anonymisation and contractual safeguards do you require from LLM API providers?", "difficulty": "hard"},
+            {"question": "What is hallucination in LLMs and how do you design a product feature that minimises its impact on business-critical decisions?", "follow_up": "How do you build a human-in-the-loop review process for an LLM feature that affects financial or legal decisions?", "difficulty": "hard"},
+            {"question": "How would you explain the difference between GPT-4 and open-source LLMs to an executive who wants to know which one to use for your product?", "follow_up": "What evaluation criteria would you use to compare two LLMs for a specific product use case, and who runs that evaluation?", "difficulty": "easy"},
+        ],
+        "python_coding": [
+            {"question": "As a product manager, what level of Python coding knowledge is useful for your role and how do you use it day-to-day?", "follow_up": "When should a PM write a quick Python script to explore a question versus asking the data team to do the analysis?", "difficulty": "easy"},
+            {"question": "How would you use Python and pandas to do a quick analysis of user retention data from a CSV file?", "follow_up": "How do you verify that your analysis is correct and not mislead yourself with a coding error?", "difficulty": "easy"},
+            {"question": "How would you use a Jupyter notebook to explore a dataset and present preliminary findings to your engineering team?", "follow_up": "What are the limitations of Jupyter notebooks for production analysis and when should you hand off to a data analyst?", "difficulty": "easy"},
+            {"question": "How would you write a simple Python script to call an LLM API and test different prompt variants for a feature you are designing?", "follow_up": "How do you systematically compare the outputs of different prompts to determine which one produces the best user experience?", "difficulty": "medium"},
+            {"question": "How would you use Python to query a product analytics database and compute a weekly active user (WAU) metric?", "follow_up": "How do you validate that your query is computing the metric correctly and matches what the BI dashboard shows?", "difficulty": "medium"},
+            {"question": "What is a REST API and how would a product manager use a simple Python script to test an LLM-powered API endpoint their team has built?", "follow_up": "How do you interpret error responses from an API and communicate issues to the engineering team effectively?", "difficulty": "easy"},
+            {"question": "How would you use Python to prototype a simple recommendation algorithm to prove a concept before engineering invests in building it?", "follow_up": "What are the risks of showing stakeholders a Python prototype and having them mistake it for a production-ready feature?", "difficulty": "medium"},
+            {"question": "How would you use Python to scrape and analyse competitor product data to inform your product roadmap?", "follow_up": "What are the legal and ethical boundaries of competitor data collection and how do you ensure compliance?", "difficulty": "medium"},
+            {"question": "How would you automate a simple data collection task using Python — for example, pulling weekly metrics from a third-party API?", "follow_up": "How do you handle API authentication and rate limits in a script that runs automatically on a schedule?", "difficulty": "medium"},
+            {"question": "What is version control (git) and how should a product manager understand it even if they don't write code?", "follow_up": "How does understanding branching and pull requests help a PM participate in technical planning discussions?", "difficulty": "easy"},
+            {"question": "How would you use Python to perform a basic cohort analysis on user signup and retention data?", "follow_up": "How do you translate cohort analysis results into a product recommendation for your leadership team?", "difficulty": "hard"},
+            {"question": "What are environment variables and why does a PM need to understand them when working with LLM API keys?", "follow_up": "What security risks arise if API keys are hardcoded in a script and accidentally pushed to a public repository?", "difficulty": "easy"},
+            {"question": "How would you write a Python script to evaluate the quality of LLM outputs against a set of golden test cases?", "follow_up": "How do you decide what goes into the golden test set and how often do you update it as the feature evolves?", "difficulty": "hard"},
+            {"question": "What is a data pipeline and how does understanding one help a PM manage dependencies between ML model training and product releases?", "follow_up": "What questions do you ask the data engineering team when a data pipeline delay threatens your product release timeline?", "difficulty": "medium"},
+            {"question": "How would you use Python to calculate the cost of LLM API usage for a feature and project monthly spend at different user scales?", "follow_up": "How do you present this cost projection to finance in a way that accounts for uncertainty in usage growth?", "difficulty": "hard"},
+            {"question": "What is a JSON file and how would a PM use one to store and review test cases for an LLM feature?", "follow_up": "How do you collaborate with engineers on structuring a JSON-based test harness for a non-deterministic LLM feature?", "difficulty": "easy"},
+            {"question": "How would you use Python to create a simple A/B test result analysis that compares conversion rates for two user segments?", "follow_up": "How do you interpret a p-value from your analysis and communicate the result to a stakeholder who wants a yes-or-no answer?", "difficulty": "hard"},
+        ],
+        "system_design": [
+            {"question": "How do you write a product requirements document (PRD) for an AI-powered feature? What sections are different from a traditional software PRD?", "follow_up": "How do you define non-functional requirements like latency, accuracy, and fairness in a PRD?", "difficulty": "easy"},
+            {"question": "How would you design the user experience for an LLM-powered chatbot feature in your product? What are the key design decisions?", "follow_up": "How do you design graceful fallbacks when the LLM cannot answer a user's question confidently?", "difficulty": "medium"},
+            {"question": "How do you make a build vs buy decision for an AI capability in your product?", "follow_up": "What long-term technical debt and vendor lock-in risks do you factor into the build vs buy decision?", "difficulty": "medium"},
+            {"question": "How would you design the onboarding flow for a new AI-powered product feature to maximise adoption and set correct expectations?", "follow_up": "How do you A/B test different onboarding approaches for an AI feature and what metrics determine success?", "difficulty": "medium"},
+            {"question": "Describe how you would approach designing a personalisation system for your product. What data and ML components are needed and what are the ethical considerations?", "follow_up": "How do you give users transparency and control over their personalisation data?", "difficulty": "hard"},
+            {"question": "How would you design a feedback mechanism for an AI feature that allows users to correct or flag incorrect outputs?", "follow_up": "How does the feedback data flow back to the model team and how do you close the loop on model improvement?", "difficulty": "hard"},
+            {"question": "What is the role of a product manager in designing an AI system's failure modes? How do you ensure graceful degradation?", "follow_up": "How do you design a product that falls back to a non-AI experience when the model is unavailable or underperforming?", "difficulty": "hard"},
+            {"question": "How would you design the privacy controls for an AI feature that personalises content based on user behaviour?", "follow_up": "How do you handle the tension between personalisation quality (which needs more data) and user privacy preferences?", "difficulty": "hard"},
+            {"question": "What is a platform versus a product in the context of AI, and how would you decide between building an AI platform for internal teams versus shipping an AI product directly to users?", "follow_up": "What success metrics do you use for an internal AI platform versus a consumer AI product?", "difficulty": "medium"},
+            {"question": "How would you design a trust and safety system for a user-generated content platform that uses AI moderation?", "follow_up": "How do you handle appeals from users whose content was incorrectly removed by the AI moderator?", "difficulty": "hard"},
+            {"question": "How do you incorporate accessibility requirements into the design of an AI-powered product feature?", "follow_up": "What specific challenges do screen reader users face with conversational AI interfaces and how do you address them?", "difficulty": "medium"},
+            {"question": "How would you design the metrics dashboard for an AI product so that both engineering and business stakeholders can monitor health?", "follow_up": "How do you translate model-level metrics (accuracy, latency, drift) into business-level metrics that a CEO can act on?", "difficulty": "medium"},
+            {"question": "What is a data flywheel and how would you design a product to benefit from one as you scale?", "follow_up": "What product strategies help you collect the user signal data needed to build a data flywheel faster?", "difficulty": "hard"},
+            {"question": "How do you design a product that uses AI to augment human decision-making rather than replace it?", "follow_up": "What research shows about when humans over-rely on AI recommendations and how do you design against that?", "difficulty": "hard"},
+            {"question": "How would you create a product roadmap for an AI feature area over a 12-month horizon given the uncertainty of ML model improvements?", "follow_up": "How do you structure milestones for an AI feature roadmap that accounts for possible model performance plateaus?", "difficulty": "medium"},
+            {"question": "What is an MVP for an AI feature and how does it differ from a traditional software MVP?", "follow_up": "How do you decide how much model performance is enough to justify putting the AI feature in front of early users?", "difficulty": "easy"},
+            {"question": "How would you design a system for collecting and managing user consent for AI data processing in a GDPR-compliant product?", "follow_up": "How do you handle a user's right to erasure (right to be forgotten) in a product where their data was used to train a model?", "difficulty": "hard"},
+        ],
+        "mlops": [
+            {"question": "As a product manager, what do you need to understand about MLOps to effectively manage a team that builds AI products?", "follow_up": "How does your understanding of MLOps practices affect how you write requirements and acceptance criteria for AI features?", "difficulty": "easy"},
+            {"question": "What is model deployment and what should a PM know about the release process for an ML model versus a traditional software release?", "follow_up": "How do you factor model deployment complexity into your product release schedule and contingency planning?", "difficulty": "easy"},
+            {"question": "What is model monitoring and what monitoring metrics should a PM track in a product dashboard for an AI feature?", "follow_up": "How do you set up an escalation process so that model degradation is surfaced to the PM before users notice?", "difficulty": "medium"},
+            {"question": "What is A/B testing for ML models and how do you design an experiment to validate whether a new model version improves product outcomes?", "follow_up": "How do you ensure you are measuring the right business outcome (e.g., user satisfaction) rather than just the model's technical metric?", "difficulty": "medium"},
+            {"question": "What is model drift and what are the product consequences if your team doesn't monitor for it?", "follow_up": "How would you budget for ongoing model maintenance and retraining as a recurring cost in your product operations plan?", "difficulty": "medium"},
+            {"question": "How do you plan and communicate a model rollback in a product context when a new model version is causing user issues?", "follow_up": "What user communication and status page update would you prepare during a model rollback incident?", "difficulty": "medium"},
+            {"question": "How do you manage the product risk of shipping a canary release of a new model version to a small percentage of users?", "follow_up": "What guardrails and rollback criteria do you define before allowing the canary release to proceed?", "difficulty": "medium"},
+            {"question": "What is responsible AI governance and what process should a PM own when shipping an AI feature?", "follow_up": "What is an AI impact assessment and which product features require one before launch?", "difficulty": "medium"},
+            {"question": "How do you work with a data science team to define the retraining schedule for a production ML model?", "follow_up": "How do you balance the cost of frequent retraining against the business risk of a model trained on stale data?", "difficulty": "hard"},
+            {"question": "What is training/serving skew and how can it affect user experience in a product powered by ML?", "follow_up": "What questions do you ask the engineering team to ensure that training data mirrors real production conditions?", "difficulty": "hard"},
+            {"question": "How do you ensure a machine learning model in your product complies with data privacy regulations like GDPR or CCPA?", "follow_up": "How do you handle a user's request to delete their data when their data was used to train the model?", "difficulty": "hard"},
+            {"question": "What is the role of a model card in responsible AI and how would you use it in your product launch process?", "follow_up": "How do you make model card information accessible and meaningful to non-technical users of your product?", "difficulty": "medium"},
+            {"question": "How do you quantify the business cost of a model quality regression and use that to prioritise a fix on the product roadmap?", "follow_up": "How do you translate a drop in model accuracy into estimated revenue impact or user satisfaction impact?", "difficulty": "hard"},
+            {"question": "What is shadow mode testing for a model and how do you use it to de-risk a major model upgrade in your product?", "follow_up": "How long do you run a shadow mode test before making a promotion decision and what criteria trigger promotion?", "difficulty": "hard"},
+            {"question": "How do you communicate technical AI infrastructure needs (GPUs, serving costs, monitoring) to a non-technical executive during budget planning?", "follow_up": "How do you build a business case for AI infrastructure investment when the ROI is difficult to measure directly?", "difficulty": "hard"},
+            {"question": "What is an experiment tracking system and how should a PM use it to stay informed about ML team progress?", "follow_up": "How do you use experiment results to update your product roadmap priorities?", "difficulty": "easy"},
+            {"question": "How do you define the go/no-go criteria for launching an AI feature into production?", "follow_up": "Who are the stakeholders involved in the go/no-go decision for an AI feature launch and what does each one approve?", "difficulty": "medium"},
+        ],
+        "behavioral": [
+            {"question": "Tell me about the most impactful AI or ML feature you have shipped as a product manager. What were the key decisions?", "follow_up": "How did you measure and communicate the business impact to leadership?", "difficulty": "medium"},
+            {"question": "Describe a time you had to make a product decision under significant uncertainty about how well an AI model would perform. How did you approach it?", "follow_up": "What would you do differently if you were in that situation again today?", "difficulty": "medium"},
+            {"question": "Tell me about a time you had to push back on engineering or data science on an AI feature that you believed was not ready to ship. How did you handle it?", "follow_up": "How do you balance maintaining a shipping cadence with responsible AI quality standards?", "difficulty": "hard"},
+            {"question": "Describe a time an AI feature you shipped caused unintended harm or a significant user complaint. What happened and how did you respond?", "follow_up": "What changes to your product development process did you make as a result?", "difficulty": "hard"},
+            {"question": "Tell me about a time you had to build alignment between data science, engineering, and business stakeholders on an AI product initiative. What was the hardest part?", "follow_up": "How did you facilitate the discussion and keep all parties moving forward together?", "difficulty": "hard"},
+            {"question": "Describe a situation where you had to communicate the limitations of an AI feature to a senior executive who had unrealistic expectations. How did you approach it?", "follow_up": "How do you build a culture of realistic AI expectations across your organisation?", "difficulty": "medium"},
+            {"question": "Tell me about a time you had to prioritise between multiple AI feature opportunities with limited data science resources. What framework did you use?", "follow_up": "How do you handle a situation where the highest-impact feature is also the technically riskiest?", "difficulty": "medium"},
+            {"question": "Describe a time you used data to change your mind about a product direction. What was the data and what decision did it change?", "follow_up": "How do you build a culture of data-driven decision-making in a product team that sometimes prefers intuition?", "difficulty": "medium"},
+            {"question": "Tell me about a time you worked with a cross-functional team including legal, compliance, or ethics stakeholders on an AI product. What challenges arose?", "follow_up": "How do you integrate responsible AI reviews into a fast-moving product development cycle without creating bottlenecks?", "difficulty": "hard"},
+            {"question": "Describe a time you had to define success metrics for a new AI feature where there was no historical baseline to compare against. How did you do it?", "follow_up": "How did you get stakeholder alignment on the metrics before launch?", "difficulty": "medium"},
+            {"question": "Tell me about a time you managed a product launch that depended on an ML model that wasn't ready on time. How did you adapt?", "follow_up": "How do you build contingency planning into an AI product roadmap to account for ML delivery uncertainty?", "difficulty": "hard"},
+            {"question": "Describe how you stay current with AI and ML trends as a product manager. Give a recent example that influenced your product strategy.", "follow_up": "How do you separate hype from genuine product opportunity when evaluating new AI capabilities?", "difficulty": "easy"},
+            {"question": "Tell me about a time you had to define the ethical boundaries for an AI feature. How did you approach the ethical review?", "follow_up": "How do you handle a situation where stakeholders disagree on where the ethical line should be drawn?", "difficulty": "hard"},
+            {"question": "Describe a time you mentored a junior PM on AI product management. What concepts or practices did you focus on?", "follow_up": "How do you develop AI product thinking in a PM who has a strong software background but limited ML exposure?", "difficulty": "easy"},
+            {"question": "Tell me about a time you had to make a difficult tradeoff between user experience and the technical constraints of an AI system. What did you decide?", "follow_up": "How do you document and communicate these constraints to your design and product teams to avoid revisiting the same debates?", "difficulty": "medium"},
+            {"question": "Describe a time you successfully launched a new AI feature that created a step-change in business value. What was the key insight that made it work?", "follow_up": "How do you identify and validate the next step-change AI opportunity for your product?", "difficulty": "medium"},
+            {"question": "Tell me about a time you failed to anticipate a user need or use case for an AI feature. What did you learn?", "follow_up": "How do you improve your user research process for AI features where users may not know what is possible?", "difficulty": "medium"},
+        ],
     },
 }
 
+# ── Build flat question bank with role tags ──────────────────────────────────
+# Canonical category names used throughout
+CANONICAL_CATEGORIES = [
+    "machine_learning",
+    "deep_learning",
+    "llm_generative_ai",
+    "python_coding",
+    "system_design",
+    "mlops",
+    "behavioral",
+]
 
-# ── Core Public Functions ──────────────────────────────────────────────────────
+# Build the flat ALL_QUESTIONS list (for backward compatibility and adaptive selection)
+ALL_QUESTIONS = []
+for _role, _cats in QUESTION_BANK_BY_ROLE.items():
+    for _cat, _qs in _cats.items():
+        for _q in _qs:
+            ALL_QUESTIONS.append({
+                **_q,
+                "category": _cat,
+                "role": _role,
+            })
 
-def generate_question(role: str, resume_text: str = "", previous_questions: list = None) -> str:
+# ── Difficulty Ordering ────────────────────────────────────────────────────────
+DIFFICULTY_ORDER = {"easy": 0, "medium": 1, "hard": 2}
+
+# ── Category Display Names ─────────────────────────────────────────────────────
+CATEGORY_LABELS = {
+    "machine_learning":  "Machine Learning",
+    "deep_learning":     "Deep Learning",
+    "llm_generative_ai": "LLM / Generative AI",
+    "python_coding":     "Python & Coding",
+    "system_design":     "System Design",
+    "mlops":             "MLOps & Deployment",
+    "behavioral":        "Behavioral",
+}
+
+# ── Role List ──────────────────────────────────────────────────────────────────
+ALL_ROLES = list(QUESTION_BANK_BY_ROLE.keys())
+
+
+# ── Core Question Selection ────────────────────────────────────────────────────
+
+def _questions_asked_set(previous_questions: list) -> set:
+    return {q.strip().lower() for q in previous_questions}
+
+
+def _to_scalar_score(score) -> float | None:
     """
-    Generate the next interview question for the given role.
-    Fully offline — uses rule-based question banks with resume-aware sub-bank
-    weighting to avoid repeats and keep questions varied.
+    Safely convert any score input to a scalar float.
+    Handles: None, int, float, list (takes average), empty list.
+    Fixes: TypeError: '>=' not supported between instances of 'list' and 'int'
+    """
+    if score is None:
+        return None
+    if isinstance(score, (int, float)):
+        return float(score)
+    if isinstance(score, (list, tuple)):
+        numeric = [x for x in score if isinstance(x, (int, float))]
+        if not numeric:
+            return None
+        return float(sum(numeric) / len(numeric))
+    try:
+        return float(score)
+    except (TypeError, ValueError):
+        return None
+
+
+def _score_difficulty_match(q: dict, last_score: float | None) -> int:
+    """
+    Adaptive difficulty scoring.
+    - No history  → prefer medium.
+    - Strong (>70) → prefer harder questions.
+    - Weak  (<45)  → prefer easier questions.
+    - Middle       → prefer medium.
+    """
+    d = DIFFICULTY_ORDER[q["difficulty"]]
+    if last_score is None:
+        return abs(d - 1)
+    if last_score >= 70:
+        return abs(d - 2)
+    if last_score < 45:
+        return abs(d - 0)
+    return abs(d - 1)
+
+
+def _category_coverage(previous_questions: list, role_questions: list) -> dict:
+    """Count how many times each category has been asked for a given role."""
+    counts = {cat: 0 for cat in CANONICAL_CATEGORIES}
+    prev_lower = {q.strip().lower() for q in previous_questions}
+    for q in role_questions:
+        if q["question"].strip().lower() in prev_lower:
+            counts[q["category"]] = counts.get(q["category"], 0) + 1
+    return counts
+
+
+def _get_role_questions(role: str) -> list:
+    """Return the flat question list for a specific role."""
+    role_bank = QUESTION_BANK_BY_ROLE.get(role, QUESTION_BANK_BY_ROLE["AI Engineer"])
+    result = []
+    for cat, qs in role_bank.items():
+        for q in qs:
+            result.append({**q, "category": cat, "role": role})
+    return result
+
+
+def generate_question(
+    role: str,
+    resume_text: str,
+    previous_questions: list,
+    last_answer_score=None,
+) -> dict:
+    """
+    Select the next interview question adaptively for the given role.
+
+    Strategy:
+    1. Filter questions to the specified role.
+    2. Filter out already-asked questions.
+    3. Prefer categories with fewer questions asked (coverage balance).
+    4. Within candidates, bias difficulty based on last answer score.
+    5. Return the full question dict (with follow_up and difficulty).
 
     Args:
-        role: Target job role.
-        resume_text: Raw resume text (may be empty).
-        previous_questions: List of already-asked questions to avoid repeats.
+        role: One of the 6 supported roles. Falls back to AI Engineer if unknown.
+        resume_text: Resume context string (used for category preference).
+        previous_questions: List of previously asked question strings.
+        last_answer_score: Scalar, list, or None — safely normalised internally.
 
     Returns:
-        A single question string.
+        dict with keys: question, follow_up, difficulty, category, role
     """
-    if previous_questions is None:
-        previous_questions = []
+    # ── BUG FIX: safely convert list/any to scalar ──────────────────────────
+    scalar_score = _to_scalar_score(last_answer_score)
 
-    # Normalise role key — fall back to closest match
-    bank = QUESTION_BANK.get(role)
-    if bank is None:
-        # Try prefix match (e.g. "Software Engineer" → "Software Engineer (SDE)")
-        for key in QUESTION_BANK:
-            if role.lower() in key.lower() or key.lower() in role.lower():
-                bank = QUESTION_BANK[key]
-                role = key
-                break
-        if bank is None:
-            bank = QUESTION_BANK["Data Scientist"]
-            role = "Data Scientist"
+    role_questions = _get_role_questions(role)
+    prev_set = _questions_asked_set(previous_questions)
+    available = [q for q in role_questions if q["question"].strip().lower() not in prev_set]
 
-    prev_lower = {q.strip().lower() for q in previous_questions}
+    if not available:
+        available = role_questions[:]
 
-    # Determine preferred sub-bank order based on resume keywords
-    ordered_subbanks = _subbank_order(role, resume_text, list(bank.keys()))
+    coverage = _category_coverage(previous_questions, role_questions)
 
-    # Walk sub-banks in preferred order; pick first unused question
-    for subbank_name in ordered_subbanks:
-        questions = bank[subbank_name]
-        # Shuffle within sub-bank for variety, but use deterministic seed
-        # based on how many questions have been asked so prevent same Q each time
-        candidates = [q for q in questions if q.strip().lower() not in prev_lower]
-        if candidates:
-            # Pick based on count so successive calls don't always return index 0
-            idx = len(previous_questions) % len(candidates)
-            return candidates[idx]
+    resume_lower = (resume_text or "").lower()
+    category_hints = {
+        "llm_generative_ai": ["llm", "gpt", "transformer", "langchain", "openai", "rag", "fine-tun"],
+        "mlops":             ["mlops", "deploy", "docker", "kubernetes", "airflow", "kubeflow", "mlflow"],
+        "deep_learning":     ["pytorch", "tensorflow", "keras", "neural", "cnn", "rnn", "attention"],
+        "system_design":     ["system design", "architecture", "microservice", "distributed", "scale"],
+        "python_coding":     ["python", "numpy", "pandas", "asyncio", "fastapi", "flask"],
+        "machine_learning":  ["machine learning", "sklearn", "xgboost", "feature engineering"],
+        "behavioral":        [],
+    }
+    resume_preferred = [
+        cat for cat, hints in category_hints.items()
+        if any(h in resume_lower for h in hints)
+    ]
 
-    # All questions exhausted — recycle from full bank, avoiding exact last asked
-    last = previous_questions[-1].strip().lower() if previous_questions else ""
-    all_qs = [q for sub in bank.values() for q in sub]
-    recycled = [q for q in all_qs if q.strip().lower() != last]
-    if recycled:
-        return recycled[len(previous_questions) % len(recycled)]
-    return all_qs[0]
+    def score_candidate(q: dict) -> tuple:
+        cat = q["category"]
+        cov = coverage.get(cat, 0)
+        resume_boost = -1 if cat in resume_preferred else 0
+        diff_score = _score_difficulty_match(q, scalar_score)
+        return (cov + resume_boost, diff_score)
+
+    available.sort(key=score_candidate)
+
+    top_n = min(4, len(available))
+    chosen = random.choice(available[:top_n])
+    return chosen
 
 
-def generate_followup(question: str, answer: str) -> str:
+def generate_followup(question_dict: dict | str, answer: str, answer_score=None) -> str:
     """
-    Generate a contextual follow-up question based on the candidate's answer.
-    Fully offline — uses keyword detection and answer length heuristics.
+    Return the follow-up question for a given question dict.
+    If the answer was strong, return the stored follow_up.
+    If weak, return a clarification prompt instead.
 
     Args:
-        question: The original interview question.
-        answer: The candidate's answer.
+        question_dict: The question dict returned by generate_question,
+                       or a plain question string (for backwards compatibility).
+        answer: The candidate's answer text.
+        answer_score: Scalar or list — safely normalised internally.
 
     Returns:
         A follow-up question string.
     """
-    if not answer or len(answer.strip()) < 10:
-        return "Could you elaborate on that? What specific steps did you take?"
+    # ── BUG FIX: handle both dict and plain string ──────────────────────────
+    if isinstance(question_dict, dict):
+        stored_followup = question_dict.get("follow_up", "")
+    else:
+        stored_followup = ""
+
+    scalar_score = _to_scalar_score(answer_score)
+    word_count = len((answer or "").split())
+
+    if not answer or word_count < 10:
+        return "Could you elaborate on that? Please walk me through your reasoning step-by-step."
+
+    if scalar_score is not None and scalar_score < 40:
+        return (
+            "Let's revisit that — can you walk me through the core concept again from first principles? "
+            "What's the key intuition behind your answer?"
+        )
+
+    if word_count < 50:
+        return (
+            f"That's a start — can you go deeper? {stored_followup}"
+            if stored_followup
+            else "Can you elaborate further with a concrete example or metric?"
+        )
+
+    if stored_followup:
+        return stored_followup
 
     answer_lower = answer.lower()
-    question_lower = question.lower()
-
-    # Keyword-triggered follow-ups (checked in priority order)
     triggers = [
-        (["challenge", "difficult", "hard", "struggle", "problem"],
-         "What was the most difficult part of that, and how did you specifically overcome it?"),
-        (["team", "collaborate", "together", "stakeholder", "cross-functional"],
-         "How did you handle disagreements or differing priorities within the team?"),
-        (["result", "outcome", "impact", "improve", "increase", "decrease", "reduce"],
-         "How did you measure the success of that outcome? What metrics did you track?"),
-        (["model", "algorithm", "train", "accuracy", "performance"],
-         "How did you validate that the model generalised well beyond your training data?"),
-        (["deploy", "production", "ship", "launch", "release"],
-         "What monitoring and rollback strategy did you put in place after deployment?"),
-        (["data", "dataset", "pipeline", "etl", "ingest"],
-         "What data quality issues did you encounter and how did you handle them?"),
-        (["design", "architect", "system", "scale", "service"],
-         "How did you account for failure modes and ensure the system remained resilient?"),
-        (["decide", "decision", "chose", "choice", "trade-off", "tradeoff"],
-         "Looking back, what would you do differently and why?"),
-        (["fail", "wrong", "mistake", "didn't work", "issue", "bug"],
-         "What did you learn from that experience and how have you applied it since?"),
-        (["learn", "taught", "course", "read", "study"],
-         "How have you applied that learning in a real project?"),
+        (["challenge", "difficult", "hard", "struggle"],
+         "What was the hardest part of that, and what would you do differently now?"),
+        (["team", "collaborate", "stakeholder"],
+         "How did you handle disagreements or conflicting priorities within the team?"),
+        (["result", "outcome", "impact", "improved", "reduced"],
+         "How did you quantify that impact? What specific metrics did you track?"),
+        (["deploy", "production", "ship"],
+         "What monitoring and rollback strategy did you put in place post-deployment?"),
+        (["model", "train", "accuracy"],
+         "How did you validate the model generalised well beyond your training distribution?"),
+        (["design", "architect", "system"],
+         "How did you account for failure modes and maintain resilience under load?"),
     ]
-
     for keywords, followup in triggers:
-        if any(kw in answer_lower or kw in question_lower for kw in keywords):
+        if any(kw in answer_lower for kw in keywords):
             return followup
 
-    # Length-based generic follow-ups — short answers get a depth probe
-    word_count = len(answer.split())
-    if word_count < 40:
-        return "Can you go deeper on that? Walk me through the specific steps you took and the outcome."
-    if word_count < 80:
-        return "That's a good start — can you quantify the impact? What numbers or metrics back that up?"
-
-    # Default rotation based on answer length for variety
-    generic = [
-        "What would you do differently if you faced this situation again?",
-        "How did you communicate this to your team or stakeholders?",
-        "What was the biggest risk in your approach, and how did you mitigate it?",
-        "How did you prioritise when multiple things were competing for your attention?",
-        "What did you learn from this that changed how you work?",
+    generics = [
+        "What would you do differently if you approached this problem today?",
+        "How would you measure success for that approach in production?",
+        "What was the biggest risk in your approach and how did you mitigate it?",
+        "How did you communicate the outcome to your team or stakeholders?",
     ]
-    return generic[word_count % len(generic)]
+    return generics[word_count % len(generics)]
 
 
-def get_opening_message(role: str) -> str:
-    """Return a warm opening message to start the interview."""
+def get_opening_message(role: str = "AI Engineer") -> str:
+    role_topics = {
+        "AI Engineer": "Machine Learning, Deep Learning, LLMs, Python, System Design, MLOps, and Behavioral",
+        "Data Scientist": "Machine Learning, Deep Learning, Statistics, Python, System Design, MLOps, and Behavioral",
+        "Software Engineer (SDE)": "ML Integration, Deep Learning Serving, LLM APIs, Python, System Design, MLOps, and Behavioral",
+        "Machine Learning Engineer": "Machine Learning, Deep Learning, LLMs, Python, System Design, MLOps, and Behavioral",
+        "Data Analyst": "Machine Learning, Analytics, LLM Tools, Python, Data Systems, Monitoring, and Behavioral",
+        "Product Manager": "ML for PMs, Deep Learning Concepts, LLM Products, Python Basics, System Design, MLOps for PMs, and Behavioral",
+    }
+    topics = role_topics.get(role, "Machine Learning, Deep Learning, LLMs, Python, System Design, MLOps, and Behavioral")
     return (
         f"Welcome! I'll be your interviewer today for the **{role}** position. "
-        f"We'll go through a series of questions — feel free to take a moment before answering. "
-        f"Speak in as much detail as you can; specific examples and outcomes always help. "
-        f"Ready? Let's begin with your first question."
+        f"We'll cover {topics} questions. "
+        "Take your time on each question — specific examples and quantified outcomes always strengthen your answers. "
+        "The difficulty will adapt based on how you're doing. Ready? Let's begin."
     )
-
-
-# ── Private Helpers ────────────────────────────────────────────────────────────
-
-def _subbank_order(role: str, resume_text: str, all_subbanks: list) -> list:
-    """
-    Return sub-bank names ordered by relevance to resume keywords.
-    Sub-banks with resume matches come first; rest follow in default order.
-    """
-    if not resume_text:
-        return all_subbanks
-
-    resume_lower = resume_text.lower()
-    keyword_map = RESUME_KEYWORD_MAP.get(role, {})
-    preferred = None
-
-    for keyword_str, subbank in keyword_map.items():
-        keywords = keyword_str.split()
-        if any(kw in resume_lower for kw in keywords):
-            preferred = subbank
-            break
-
-    if preferred and preferred in all_subbanks:
-        ordered = [preferred] + [s for s in all_subbanks if s != preferred]
-        return ordered
-
-    return all_subbanks

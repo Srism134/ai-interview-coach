@@ -1,99 +1,87 @@
 # evaluation.py
 # Evaluates individual interview answers using rule-based heuristics. Fully offline.
+# Tailored for AI Engineer role.
 
 import re
 from utils import clamp
 
-# ── Role-Specific Technical Keyword Sets ──────────────────────────────────────
+# ── AI Engineer Technical Keyword Set ─────────────────────────────────────────
 
 TECHNICAL_KEYWORDS = {
-    "Data Scientist": [
-        "model", "feature", "training", "accuracy", "precision", "recall", "f1",
-        "overfitting", "underfitting", "regularisation", "regularization",
-        "cross-validation", "bias", "variance", "gradient", "loss", "metric",
-        "distribution", "hypothesis", "p-value", "confidence interval",
-        "regression", "classification", "clustering", "neural", "ensemble",
-        "random forest", "boosting", "bagging", "pca", "dimensionality",
-        "imputation", "normalisation", "normalization", "standardisation",
-        "auc", "roc", "confusion matrix", "hyperparameter", "pipeline",
-        "a/b test", "experiment", "statistical", "correlation", "causation",
-    ],
-    "Software Engineer (SDE)": [
-        "time complexity", "space complexity", "big o", "algorithm", "data structure",
-        "hash", "tree", "graph", "queue", "stack", "heap", "linked list",
-        "cache", "database", "sql", "index", "api", "rest", "microservice",
-        "concurrency", "thread", "async", "latency", "throughput", "scalability",
-        "load balancer", "cap theorem", "distributed", "consistency", "availability",
-        "design pattern", "solid", "refactor", "unit test", "integration test",
-        "ci/cd", "deployment", "docker", "kubernetes", "version control",
-    ],
-    "ML Engineer": [
-        "pipeline", "feature store", "model serving", "inference", "latency",
-        "batch", "real-time", "mlops", "drift", "monitoring", "retraining",
-        "experiment tracking", "model registry", "containerise", "containerize",
-        "quantisation", "quantization", "onnx", "triton", "kubernetes", "docker",
-        "training", "validation", "deployment", "shadow", "canary", "rollback",
-        "skew", "data quality", "etl", "orchestration", "airflow", "kubeflow",
-        "model performance", "a/b testing", "feature engineering", "versioning",
-    ],
-    "Product Manager": [
-        "roadmap", "priority", "stakeholder", "metric", "kpi", "north star",
-        "user research", "customer", "hypothesis", "mvp", "iteration",
-        "agile", "sprint", "backlog", "trade-off", "tradeoff", "impact",
-        "effort", "revenue", "retention", "engagement", "funnel", "conversion",
-        "a/b test", "feature flag", "launch", "success criteria", "okr",
-    ],
-    "Data Analyst": [
-        "sql", "query", "join", "aggregate", "window function", "cte",
-        "data quality", "validation", "outlier", "distribution", "cohort",
-        "funnel", "retention", "engagement", "statistical", "significance",
-        "p-value", "confidence", "hypothesis", "visualisation", "visualization",
-        "dashboard", "insight", "trend", "seasonality", "correlation",
-        "etl", "pipeline", "tableau", "looker", "excel", "python", "pandas",
+    "AI Engineer": [
+        # ML fundamentals
+        "bias", "variance", "overfitting", "underfitting", "regularisation", "regularization",
+        "gradient descent", "adam", "sgd", "adamw", "loss function", "cross-entropy",
+        "backpropagation", "learning rate", "batch size", "epoch", "convergence",
+        "cross-validation", "hyperparameter", "ensemble", "random forest", "boosting",
+        "xgboost", "lightgbm", "precision", "recall", "f1", "auc", "roc",
+        "confusion matrix", "class imbalance", "smote", "transfer learning", "fine-tuning",
+        # Deep learning
+        "transformer", "attention", "self-attention", "multi-head attention",
+        "encoder", "decoder", "embedding", "positional encoding", "layer norm",
+        "batch norm", "dropout", "residual", "skip connection", "cnn", "rnn",
+        "lstm", "gru", "diffusion", "vae", "gan", "distillation", "quantisation", "quantization",
+        "pytorch", "tensorflow", "keras", "onnx", "triton",
+        # LLM / GenAI
+        "llm", "gpt", "bert", "rlhf", "dpo", "rag", "retrieval", "vector database",
+        "embedding", "hallucination", "prompt", "chain-of-thought", "few-shot",
+        "zero-shot", "lora", "qlora", "peft", "temperature", "top-p", "top-k",
+        "langchain", "openai", "hugging face", "agent", "tool use", "react",
+        "constitutional ai", "alignment", "guardrails",
+        # MLOps / Deployment
+        "mlops", "pipeline", "feature store", "model registry", "experiment tracking",
+        "mlflow", "weights & biases", "wandb", "kubeflow", "airflow",
+        "docker", "kubernetes", "ci/cd", "canary", "shadow deployment", "blue-green",
+        "model drift", "data drift", "monitoring", "retraining", "serving",
+        "inference", "latency", "throughput", "p99", "sla", "fastapi", "triton",
+        "onnx runtime", "tensorrt", "model quantisation",
+        # System design / infra
+        "distributed training", "data parallelism", "model parallelism", "tensor parallelism",
+        "pipeline parallelism", "gpu", "cuda", "hnsw", "faiss", "approximate nearest neighbour",
+        "point-in-time", "feature engineering", "data leakage",
+        # Python / coding
+        "numpy", "pandas", "asyncio", "generator", "decorator", "gil", "multiprocessing",
+        "type hint", "pydantic", "context manager", "complexity", "big o", "lru cache",
     ],
 }
 
-# Fallback generic keywords if role not found
+# Fallback
 GENERIC_KEYWORDS = ["result", "impact", "approach", "solution", "implement",
                     "analyse", "analyze", "measure", "improve", "design"]
 
 # ── Structural Signal Patterns ─────────────────────────────────────────────────
 
-# STAR method signals
 STAR_SIGNALS = {
-    "situation": ["situation", "context", "background", "working at", "was tasked", "our team"],
-    "task": ["task", "goal", "objective", "needed to", "responsibility", "challenge was"],
+    "situation": ["situation", "context", "background", "working at", "was tasked", "our team", "the problem was"],
+    "task": ["task", "goal", "objective", "needed to", "responsibility", "challenge was", "i was asked to"],
     "action": ["so i", "i decided", "i implemented", "i built", "i designed", "i worked",
-               "my approach", "i first", "then i", "i used", "i created", "i wrote"],
+               "my approach", "i first", "then i", "i used", "i created", "i wrote", "i chose"],
     "result": ["result", "outcome", "achieved", "improved", "reduced", "increased",
                "led to", "this meant", "as a result", "ultimately", "in the end",
-               "%", "percent", "times faster", "x faster", "x improvement"],
+               "%", "percent", "times faster", "x faster", "x improvement", "latency dropped",
+               "accuracy increased", "cost reduced"],
 }
 
-# Confidence signals (positive = shows conviction, negative = hedging)
 POSITIVE_CONFIDENCE = ["i decided", "i chose", "my approach", "i believe", "clearly",
-                       "specifically", "the key insight", "i found that", "i determined"]
+                       "specifically", "the key insight", "i found that", "i determined",
+                       "i demonstrated", "i proved"]
 NEGATIVE_CONFIDENCE = ["i think maybe", "not sure", "i guess", "kind of", "sort of",
                        "i don't really know", "not totally sure", "i might be wrong",
                        "i'm not sure if", "probably maybe"]
 
-# Communication structure signals
 STRUCTURE_SIGNALS = ["first", "second", "third", "finally", "in summary", "to summarise",
                      "to summarize", "firstly", "secondly", "lastly", "in conclusion",
                      "the main point", "importantly", "specifically", "for example",
-                     "for instance", "such as", "because", "therefore", "however"]
+                     "for instance", "such as", "because", "therefore", "however",
+                     "on the other hand", "as a result", "this means"]
 
 
 # ── Scoring Heuristics ─────────────────────────────────────────────────────────
 
 def _score_clarity(answer: str) -> int:
-    """
-    Score 0-10 based on answer length, structure signals, and coherence.
-    """
     words = answer.split()
     word_count = len(words)
 
-    # Base score from length (too short or too long loses points)
     if word_count < 20:
         base = 2
     elif word_count < 40:
@@ -105,19 +93,18 @@ def _score_clarity(answer: str) -> int:
     elif word_count < 400:
         base = 8
     else:
-        base = 7  # overly long answers can lose clarity
+        base = 7
 
     lower = answer.lower()
-
-    # Bonus: structural signposting
     structure_hits = sum(1 for s in STRUCTURE_SIGNALS if s in lower)
     structure_bonus = min(structure_hits, 3)
 
-    # Bonus: uses concrete numbers or percentages
-    has_numbers = bool(re.search(r'\b\d+[\.,]?\d*\s*(%|x\b|times|ms|seconds|hours|days|users|requests)', lower))
+    has_numbers = bool(re.search(
+        r'\b\d+[\.,]?\d*\s*(%|x\b|times|ms|seconds|hours|days|users|requests|tokens|gb|mb|params)',
+        lower
+    ))
     number_bonus = 1 if has_numbers else 0
 
-    # Penalty: very repetitive (same word > 5 times in short answer)
     if word_count < 100:
         word_freq = {}
         for w in words:
@@ -132,23 +119,18 @@ def _score_clarity(answer: str) -> int:
     return int(clamp(score, 1, 10))
 
 
-def _score_technical(answer: str, role: str) -> int:
-    """
-    Score 0-10 based on presence of domain-relevant technical keywords.
-    """
+def _score_technical(answer: str, role: str = "AI Engineer") -> int:
     lower = answer.lower()
-    keywords = TECHNICAL_KEYWORDS.get(role, GENERIC_KEYWORDS)
+    keywords = TECHNICAL_KEYWORDS.get(role, TECHNICAL_KEYWORDS.get("AI Engineer", GENERIC_KEYWORDS))
 
     hits = sum(1 for kw in keywords if kw in lower)
     word_count = len(answer.split())
 
-    # Density: hits per 100 words (so longer answers aren't unfairly penalised)
     if word_count > 0:
         density = (hits / word_count) * 100
     else:
         density = 0
 
-    # Map density to score
     if density >= 8:
         base = 9
     elif density >= 5:
@@ -166,7 +148,6 @@ def _score_technical(answer: str, role: str) -> int:
     else:
         base = 2
 
-    # Absolute keyword count bonus for long, technically rich answers
     if hits >= 6:
         base = min(base + 1, 10)
 
@@ -174,9 +155,6 @@ def _score_technical(answer: str, role: str) -> int:
 
 
 def _score_communication(answer: str) -> int:
-    """
-    Score 0-10 based on STAR method coverage, use of examples, and structure.
-    """
     lower = answer.lower()
     star_coverage = 0
 
@@ -184,144 +162,123 @@ def _score_communication(answer: str) -> int:
         if any(s in lower for s in signals):
             star_coverage += 1
 
-    # Base from STAR coverage (0-4 components)
     base = {0: 3, 1: 4, 2: 6, 3: 8, 4: 9}.get(star_coverage, 3)
 
-    # Bonus: uses concrete example ("for example", "for instance", "specifically")
-    example_bonus = 1 if any(s in lower for s in ["for example", "for instance", "specifically"]) else 0
-
-    # Bonus: uses first-person ownership ("I did X") rather than passive
-    ownership = len(re.findall(r'\bi\s+(built|designed|implemented|created|decided|chose|led|wrote|ran|tested)', lower))
+    example_bonus = 1 if any(s in lower for s in ["for example", "for instance", "specifically", "concretely"]) else 0
+    ownership = len(re.findall(
+        r'\bi\s+(built|designed|implemented|created|decided|chose|led|wrote|ran|tested|deployed|trained|fine-tuned)',
+        lower
+    ))
     ownership_bonus = min(ownership, 2)
 
-    # Penalty: answer is a bullet-point dump with no narrative
-    bullet_count = answer.count('\n-') + answer.count('\n•') + answer.count('\n*')
-    bullet_penalty = 1 if bullet_count > 5 else 0
-
-    score = base + example_bonus + ownership_bonus - bullet_penalty
+    score = base + example_bonus + ownership_bonus
     return int(clamp(score, 1, 10))
 
 
 def _score_confidence(answer: str) -> int:
-    """
-    Score 0-10 based on conviction signals vs hedging language.
-    """
     lower = answer.lower()
 
     positive_hits = sum(1 for s in POSITIVE_CONFIDENCE if s in lower)
     negative_hits = sum(1 for s in NEGATIVE_CONFIDENCE if s in lower)
 
-    # Count definitive statements (subject + strong verb)
-    definitive = len(re.findall(
-        r'\b(i (decided|chose|built|implemented|led|designed|realised|realized|concluded|determined))\b',
-        lower
-    ))
-
-    # Count hedges
-    hedge_patterns = r'\b(maybe|perhaps|might|could possibly|not sure|i think|i guess|kind of|sort of)\b'
-    hedge_count = len(re.findall(hedge_patterns, lower))
-
     base = 6
-    score = base + positive_hits + min(definitive, 2) - negative_hits - min(hedge_count, 3)
-    return int(clamp(score, 1, 10))
+    base += min(positive_hits, 2)
+    base -= min(negative_hits * 2, 4)
+
+    # Passive voice penalty
+    passive_count = len(re.findall(r'\b(was|were|been)\s+\w+ed\b', lower))
+    if passive_count > 3:
+        base -= 1
+
+    return int(clamp(base, 1, 10))
 
 
-def _generate_feedback(answer: str, question: str, role: str,
-                       clarity: int, technical: int,
-                       communication: int, confidence: int) -> str:
-    """
-    Generate a readable, specific feedback string from scores and answer signals.
-    """
+# ── Feedback Generation ────────────────────────────────────────────────────────
+
+def _generate_feedback(
+    answer: str, question: str, role: str,
+    clarity: int, technical: int, communication: int, confidence: int
+) -> str:
     parts = []
     lower = answer.lower()
-    word_count = len(answer.split())
 
-    # Clarity feedback
-    if clarity >= 8:
-        parts.append("Your answer was well-structured and easy to follow.")
-    elif clarity >= 6:
-        parts.append("Your answer covered the topic reasonably well.")
-    elif word_count < 40:
-        parts.append("Your answer was quite brief — try to elaborate with more detail and context.")
+    composite = int((technical * 0.30 + communication * 0.25 + confidence * 0.20 + clarity * 0.25) * 10)
+
+    if composite >= 80:
+        parts.append("Strong answer overall.")
+    elif composite >= 60:
+        parts.append("Solid answer with some areas to sharpen.")
     else:
-        parts.append("Try to structure your answer more clearly using signpost phrases like 'first', 'then', and 'as a result'.")
+        parts.append("This answer needs more depth and specificity.")
 
-    # Technical feedback
     if technical >= 8:
-        parts.append("You demonstrated strong domain knowledge with relevant technical depth.")
+        parts.append("Excellent technical depth — you demonstrated clear command of the concepts.")
     elif technical >= 6:
-        parts.append("Good use of relevant concepts — adding one or two more specific examples would strengthen this.")
-    else:
-        parts.append("Try to include more domain-specific concepts or terminology to demonstrate technical depth.")
+        parts.append("Good technical coverage — consider adding more precise terminology or explaining trade-offs explicitly.")
+    elif technical < 5:
+        parts.append("The answer lacked technical depth — for an AI Engineer role, you should reference specific algorithms, tools, or architectural choices.")
 
-    # STAR / communication feedback
-    star_coverage = sum(
-        1 for _, signals in STAR_SIGNALS.items() if any(s in lower for s in signals)
-    )
     if communication >= 8:
-        parts.append("You used a clear narrative structure that made your answer compelling.")
-    elif star_coverage < 2:
-        parts.append("Consider using the STAR method (Situation → Task → Action → Result) to frame your answer — it makes responses much clearer.")
+        parts.append("You used a clear narrative structure that made your answer easy to follow.")
+    elif sum(1 for _, signals in STAR_SIGNALS.items() if any(s in lower for s in signals)) < 2:
+        parts.append(
+            "Use the STAR method (Situation → Task → Action → Result) to frame your answer — "
+            "it gives interviewers a clear narrative arc to follow."
+        )
     else:
-        parts.append("Good structure — quantifying your results with numbers or percentages would make the impact even clearer.")
+        parts.append("Good structure — quantifying your results with numbers or percentages would sharpen the impact.")
 
-    # Confidence feedback
     if confidence >= 8:
-        parts.append("You communicated with strong conviction and ownership.")
+        parts.append("You answered with strong conviction and clear ownership.")
     elif confidence < 5:
-        hedge_count = len(re.findall(
-            r'\b(maybe|perhaps|not sure|i guess|kind of|sort of)\b', lower
-        ))
+        hedge_count = len(re.findall(r'\b(maybe|perhaps|not sure|i guess|kind of|sort of)\b', lower))
         if hedge_count > 1:
-            parts.append("Reduce hedging language ('maybe', 'I guess', 'sort of') — own your experience and decisions with confidence.")
+            parts.append(
+                "Reduce hedging language ('maybe', 'I guess', 'sort of') — own your experience and decisions directly."
+            )
         else:
-            parts.append("Be more direct — state what you did and decided rather than what 'could' or 'might' have been done.")
+            parts.append("Be more direct: state what you did and decided rather than what 'could' or 'might' have been done.")
 
     return " ".join(parts)
 
 
-def _generate_improved_answer(question: str, role: str) -> str:
-    """
-    Return a structural template for a strong answer to this type of question.
-    """
+def _generate_improved_answer(question: str, role: str = "AI Engineer") -> str:
     q_lower = question.lower()
 
-    if any(w in q_lower for w in ["time", "tell me about", "describe a", "walk me through a", "example of"]):
+    if any(w in q_lower for w in ["tell me about", "describe a", "walk me through a", "time when"]):
         return (
-            "A strong answer would follow the STAR method: "
-            "(1) Situation — briefly set the context (team, company stage, constraints); "
-            "(2) Task — what specifically was your responsibility; "
-            "(3) Action — detail the concrete steps you personally took, including tools and reasoning; "
-            "(4) Result — quantify the outcome (e.g., '30% reduction in latency', '2x increase in precision'). "
-            "Aim for 2-3 minutes of spoken content with one concrete metric."
+            "A strong answer uses the STAR method: "
+            "(1) Situation — set the scene briefly (team size, constraints, business context); "
+            "(2) Task — your specific responsibility; "
+            "(3) Action — concrete steps you personally took, tools and reasoning; "
+            "(4) Result — quantify the outcome (e.g., '40% latency reduction', '2 points of F1 gain'). "
+            "Aim for 2-3 minutes spoken with one clear metric."
         )
-    elif any(w in q_lower for w in ["how would you", "how do you", "design", "approach", "build"]):
+    elif any(w in q_lower for w in ["how would you", "how do you", "design", "build", "architect"]):
         return (
-            "A strong answer would: "
-            "(1) Clarify assumptions and constraints upfront; "
-            "(2) Outline your high-level approach before diving into details; "
-            "(3) Walk through your reasoning step-by-step, calling out tradeoffs explicitly; "
-            "(4) Mention how you'd validate or measure success. "
-            "Use concrete tools, techniques, or frameworks you've actually used."
+            "A strong answer: "
+            "(1) Clarifies assumptions and constraints upfront; "
+            "(2) Outlines the high-level approach before details; "
+            "(3) Walks through reasoning step-by-step with explicit tradeoffs; "
+            "(4) Names concrete tools, frameworks, or algorithms you've used; "
+            "(5) Describes how you'd validate or monitor success in production."
         )
-    elif any(w in q_lower for w in ["explain", "what is", "difference between", "define"]):
+    elif any(w in q_lower for w in ["explain", "what is", "difference between", "define", "how does"]):
         return (
-            "A strong answer would: "
-            "(1) Give a concise, precise definition in your own words; "
-            "(2) Explain the intuition behind it (why it works); "
-            "(3) Give a concrete real-world example from your experience; "
-            "(4) Mention edge cases or when this concept does/doesn't apply. "
-            "Avoid reciting a textbook definition — show you truly understand it."
+            "A strong answer: "
+            "(1) Gives a concise, precise definition in your own words; "
+            "(2) Explains the intuition (why it works mechanistically); "
+            "(3) Provides a concrete real-world example from your experience; "
+            "(4) Discusses edge cases or limitations. "
+            "Avoid textbook recitation — show you truly understand the concept."
         )
     else:
         return (
             "A strong answer is specific, uses real examples with measurable outcomes, "
-            "demonstrates clear reasoning, and shows ownership of decisions made. "
-            "Where possible, quantify your impact (time saved, accuracy gained, revenue impact)."
+            "demonstrates clear reasoning, and shows ownership of decisions. "
+            "Quantify impact wherever possible (latency saved, accuracy gained, cost reduced)."
         )
 
-
-# ── Default Fallback ───────────────────────────────────────────────────────────
 
 def _default_evaluation(question: str, answer: str) -> dict:
     return {
@@ -330,7 +287,10 @@ def _default_evaluation(question: str, answer: str) -> dict:
         "communication": 5,
         "confidence": 5,
         "feedback": "Unable to evaluate automatically. Please review your answer manually.",
-        "improved_answer": "A strong answer would include specific examples, measurable outcomes, technical depth, and clear structure (Situation → Task → Action → Result).",
+        "improved_answer": (
+            "A strong answer would include specific examples, measurable outcomes, "
+            "technical depth, and clear structure (Situation → Task → Action → Result)."
+        ),
         "question": question,
         "answer": answer,
     }
@@ -338,62 +298,41 @@ def _default_evaluation(question: str, answer: str) -> dict:
 
 # ── Main Evaluation Function ───────────────────────────────────────────────────
 
-def evaluate_answer(answer: str, question: str, role: str = "General") -> dict:
+def evaluate_answer(answer: str, question: str, role: str = "AI Engineer") -> dict:
     """
     Evaluate a candidate's answer using rule-based heuristics. Fully offline.
-
-    Args:
-        answer: The candidate's answer text.
-        question: The interview question that was asked.
-        role: The target role (used for technical keyword matching).
-
-    Returns:
-        dict with keys: clarity, technical, communication, confidence,
-                        feedback, improved_answer, question, answer
     """
     if not answer or len(answer.strip()) < 5:
         result = _default_evaluation(question, answer)
         result["feedback"] = "No answer provided."
         return result
 
-    # Normalise role for keyword lookup
-    matched_role = role
-    if role not in TECHNICAL_KEYWORDS:
-        for key in TECHNICAL_KEYWORDS:
-            if role.lower() in key.lower() or key.lower() in role.lower():
-                matched_role = key
-                break
-
     clarity      = _score_clarity(answer)
-    technical    = _score_technical(answer, matched_role)
+    technical    = _score_technical(answer, "AI Engineer")
     communication = _score_communication(answer)
     confidence   = _score_confidence(answer)
 
     feedback = _generate_feedback(
-        answer, question, matched_role,
+        answer, question, "AI Engineer",
         clarity, technical, communication, confidence
     )
-    improved = _generate_improved_answer(question, matched_role)
+    improved = _generate_improved_answer(question, "AI Engineer")
 
     return {
-        "clarity":       int(clamp(clarity, 0, 10)),
-        "technical":     int(clamp(technical, 0, 10)),
-        "communication": int(clamp(communication, 0, 10)),
-        "confidence":    int(clamp(confidence, 0, 10)),
-        "feedback":      feedback,
+        "clarity":        int(clamp(clarity, 0, 10)),
+        "technical":      int(clamp(technical, 0, 10)),
+        "communication":  int(clamp(communication, 0, 10)),
+        "confidence":     int(clamp(confidence, 0, 10)),
+        "feedback":       feedback,
         "improved_answer": improved,
-        "question":      question,
-        "answer":        answer,
+        "question":       question,
+        "answer":         answer,
     }
 
 
 # ── Composite Score ────────────────────────────────────────────────────────────
 
 def answer_composite_score(evaluation: dict) -> float:
-    """
-    Compute a single 0-100 composite score for one answer.
-    Weights: technical 30%, communication 25%, confidence 20%, clarity 25%
-    """
     weights = {
         "technical":     0.30,
         "communication": 0.25,
@@ -410,7 +349,6 @@ def answer_composite_score(evaluation: dict) -> float:
 # ── Formatted Display ──────────────────────────────────────────────────────────
 
 def format_evaluation(evaluation: dict) -> str:
-    """Format an evaluation dict into a readable markdown string."""
     c  = evaluation.get("clarity", 0)
     t  = evaluation.get("technical", 0)
     co = evaluation.get("communication", 0)
@@ -439,7 +377,6 @@ def format_evaluation(evaluation: dict) -> str:
 
 
 def score_label(score: float) -> str:
-    """Return a label for a 0-100 score."""
     if score >= 80:
         return "Excellent"
     elif score >= 65:
